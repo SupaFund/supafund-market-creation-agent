@@ -1,49 +1,68 @@
+from fastapi import FastAPI, HTTPException, Body
+from pydantic import BaseModel, Field
 import logging
-import time
 
-from src.supabase_client import get_supabase_client, fetch_and_lock_job, get_application_details, update_job_status
-from src.omen_creator import create_omen_market
+from .supabase_client import get_application_details
+from .omen_creator import create_omen_market
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-POLL_INTERVAL = 10  # seconds
+app = FastAPI(
+    title="Supafund Market Creation Agent",
+    description="An agent to create prediction markets on Omen for Supafund applications.",
+    version="1.0.0"
+)
 
-def main():
-    """Main function to run the market creation agent."""
-    logging.info("Starting Supafund Market Creation Agent...")
-    supabase = get_supabase_client()
+class MarketCreationRequest(BaseModel):
+    application_id: str = Field(..., 
+        description="The UUID of the application in Supafund.",
+        examples=["a1b2c3d4-e5f6-7890-1234-567890abcdef"]
+    )
 
-    while True:
-        try:
-            job = fetch_and_lock_job(supabase)
-            if job:
-                try:
-                    application_id = job.get("application_id")
-                    if not application_id:
-                        raise ValueError("Job is missing application_id")
-
-                    logging.info(f"Processing application_id: {application_id}")
-                    application_details = get_application_details(supabase, application_id)
-                    if not application_details:
-                        raise ValueError(f"Could not retrieve details for application {application_id}")
-
-                    market_result = create_omen_market(application_details)
-
-                    update_job_status(supabase, job["id"], "completed", result=market_result)
-                    logging.info(f"Successfully processed job {job['id']}.")
-
-                except Exception as e:
-                    error_message = f"Failed to process job {job['id']}: {e}"
-                    logging.error(error_message)
-                    update_job_status(supabase, job["id"], "error", error_message=error_message)
-            else:
-                logging.info(f"No pending jobs. Waiting for {POLL_INTERVAL} seconds...")
-        
-        except Exception as e:
-            logging.error(f"An error occurred in the main loop: {e}")
-
-        time.sleep(POLL_INTERVAL)
+@app.get("/", tags=["Health Check"])
+async def read_root():
+    """
+    Root endpoint for health checks.
+    """
+    return {"status": "ok", "message": "Supafund Market Creation Agent is running."}
 
 
-if __name__ == "__main__":
-    main()
+@app.post("/create-market", tags=["Market Creation"])
+async def handle_create_market(request: MarketCreationRequest):
+    """
+    Receives a request to create a prediction market for a given application.
+    """
+    application_id = request.application_id
+    logger.info(f"Received request to create market for application_id: {application_id}")
+
+    # 1. Fetch application details from Supabase
+    logger.info(f"Fetching details for application {application_id}...")
+    application_details = get_application_details(application_id)
+
+    if not application_details:
+        logger.error(f"Application with id {application_id} not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Application with id {application_id} not found.",
+        )
+
+    # 2. Trigger Omen market creation
+    logger.info(f"Triggering Omen market creation for application {application_id}...")
+    success, message = create_omen_market(application_details)
+
+    if not success:
+        logger.error(f"Failed to create market for application {application_id}: {message}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create market: {message}",
+        )
+
+    logger.info(f"Successfully created market for application {application_id}.")
+    return {
+        "status": "success",
+        "message": "Market creation process initiated successfully.",
+        "application_id": application_id,
+        "omen_creation_output": message,
+    }
