@@ -131,6 +131,56 @@ The `--reload` flag enables hot-reloading, which is convenient for development. 
   }
   ```
 
+### Place a Bet
+
+- **Endpoint**: `POST /bet`
+- **Description**: Places a bet on a specified prediction market.
+- **Request Body**:
+  ```json
+  {
+    "market_id": "0x86376012a5185f484ec33429cadfa00a8052d9d4",
+    "amount_usd": 0.01,
+    "outcome": "Yes",
+    "from_private_key": "YOUR_PRIVATE_KEY",
+    "safe_address": "OPTIONAL_SAFE_ADDRESS",
+    "auto_deposit": true
+  }
+  ```
+- **Example `curl` Request**:
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/bet" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "market_id": "0x86376012a5185f484ec33429cadfa00a8052d9d4",
+    "amount_usd": 0.01,
+    "outcome": "Yes",
+    "from_private_key": "your-private-key",
+    "auto_deposit": true
+  }'
+  ```
+
+#### Responses
+
+- **Success (200 OK)**:
+  Indicates that the bet was successfully placed.
+  ```json
+  {
+    "status": "success",
+    "message": "Bet placed successfully.",
+    "market_id": "0x86376012a5185f484ec33429cadfa00a8052d9d4",
+    "amount_usd": 0.01,
+    "outcome": "Yes",
+    "transaction_output": "Bet placed successfully. Transaction hash: 0x..."
+  }
+  ```
+- **Internal Server Error (500 Internal Server Error)**:
+  An error occurred during the betting process.
+  ```json
+  {
+    "detail": "Failed to place bet: ..."
+  }
+  ```
+
 ### Health Check
 
 - **Endpoint**: `GET /`
