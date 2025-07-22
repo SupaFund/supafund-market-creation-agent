@@ -3,6 +3,8 @@ import logging
 import shlex
 import os
 import sys
+import re
+import json
 from datetime import datetime, timedelta, timezone
 from .config import Config
 
@@ -55,16 +57,28 @@ def create_omen_market(application_details: dict) -> tuple[bool, str]:
 
     # --- Step 2: Prepare and run the market creation script ---
     project_name = application_details.get("project_name")
+    project_description = application_details.get("project_description", "")
+    program_description = application_details.get("program_description", "")
     program_name = application_details.get("program_name")
     application_id = application_details.get("application_id")
 
     if not all([project_name, program_name, application_id]):
         return False, "Missing project_name, program_name, or application_id in details."
 
-    # 1. Construct the question with metadata
+    # 1. Construct the question with metadata and descriptions
+    descriptions_parts = []
+    if project_description:
+        descriptions_parts.append(f"Project: {project_description}")
+    if program_description:
+        descriptions_parts.append(f"Program: {program_description}")
+    
+    # Join descriptions with semicolon if any exist
+    descriptions_text = "; ".join(descriptions_parts) if descriptions_parts else ""
+    
     question = (
         f'Will project "{project_name}" be approved for the "{program_name}" program?'
         f' [Supafund App: {application_id}]'
+        + (f' <contextStart>{descriptions_text}<contextEnd>' if descriptions_text else '')
     )
 
     # 2. Determine the closing time
@@ -124,3 +138,103 @@ def create_omen_market(application_details: dict) -> tuple[bool, str]:
         error_message = f"An unexpected error occurred: {e}"
         logging.error(error_message)
         return False, str(e)
+
+
+def parse_market_output(output: str) -> dict:
+    """
+    Parse the output from Omen market creation script to extract market information.
+    
+    Args:
+        output: Raw output string from the market creation script
+        
+    Returns:
+        Dictionary containing extracted market information
+    """
+    market_info = {
+        "market_id": "",
+        "market_title": "",
+        "market_url": "",
+        "market_question": "",
+        "closing_time": None,
+        "initial_funds_usd": 0.01,
+        "creation_timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    try:
+        # Try to find market ID in the output
+        # Common patterns for market ID extraction
+        market_id_patterns = [
+            r"market[_\s]id[:\s]*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
+            r"created[_\s]market[:\s]*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
+            r"address[:\s]*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
+            r"Market ID: ([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
+        ]
+        
+        for pattern in market_id_patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                market_info["market_id"] = match.group(1)
+                if not market_info["market_id"].startswith("0x"):
+                    market_info["market_id"] = "0x" + market_info["market_id"]
+                break
+        
+        # Try to find market URL
+        url_patterns = [
+            r"https?://[^\s]+omen[^\s]*market[^\s]*",
+            r"https?://omen\.eth\.limo/[^\s]*",
+            r"https?://[^\s]*omen[^\s]*"
+        ]
+        
+        for pattern in url_patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                market_info["market_url"] = match.group(0)
+                break
+        
+        # Extract question if visible in output
+        question_patterns = [
+            r"question[:\s]*[\"']([^\"']+)[\"']",
+            r"Will project[^?]*\?[^<]*<contextStart>[^<]*<contextEnd>",
+        ]
+        
+        for pattern in question_patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                market_info["market_question"] = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                break
+        
+        # Try to extract closing time
+        time_patterns = [
+            r"closing[_\s]time[:\s]*([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})",
+            r"deadline[:\s]*([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})",
+        ]
+        
+        for pattern in time_patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                market_info["closing_time"] = match.group(1)
+                break
+        
+        # Try to extract funding amount
+        funding_patterns = [
+            r"initial[_\s]funds[:\s]*\$?([0-9]+\.?[0-9]*)",
+            r"funding[:\s]*\$?([0-9]+\.?[0-9]*)",
+        ]
+        
+        for pattern in funding_patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                market_info["initial_funds_usd"] = float(match.group(1))
+                break
+        
+        # Generate market title based on available info
+        if market_info["market_question"]:
+            market_info["market_title"] = market_info["market_question"][:100] + "..." if len(market_info["market_question"]) > 100 else market_info["market_question"]
+        
+        logging.info(f"Parsed market info: {market_info}")
+        
+    except Exception as e:
+        logging.error(f"Error parsing market output: {e}")
+        logging.debug(f"Raw output: {output}")
+    
+    return market_info

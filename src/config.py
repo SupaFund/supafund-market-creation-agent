@@ -8,7 +8,8 @@ CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CONFIG_DIR)
 
 # Load environment variables from .env file in the project root
-load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+env_file_path = os.path.join(PROJECT_ROOT, '.env')
+load_dotenv(env_file_path, override=True)
 
 class Config:
     """
@@ -17,7 +18,9 @@ class Config:
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     OMEN_PRIVATE_KEY = os.getenv("OMEN_PRIVATE_KEY")
+    GRAPH_API_KEY = os.getenv("GRAPH_API_KEY")
     POETRY_PATH = os.getenv("POETRY_PATH", "poetry") # Default to 'poetry' if not set
+    
     
     # Resolve OMEN_SCRIPT_PROJECT_PATH to an absolute path
     _omen_script_path_raw = os.getenv("OMEN_SCRIPT_PROJECT_PATH", ".")
@@ -36,6 +39,7 @@ class Config:
             "SUPABASE_URL",
             "SUPABASE_KEY",
             "OMEN_PRIVATE_KEY",
+            "GRAPH_API_KEY",
         ]
         missing_vars = [var for var in required_vars if not getattr(Config, var)]
         if missing_vars:
