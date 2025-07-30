@@ -1,22 +1,17 @@
 {
-  "builds": [
-    {
-      "src": "api/main.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/main.py": {
+      "runtime": "@vercel/python",
+      "maxDuration": 300,
+      "memory": 3008
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
       "dest": "api/main.py"
     }
   ],
-  "functions": {
-    "api/main.py": {
-      "maxDuration": 300,
-      "memory": 3008
-    }
-  },
   "env": {
     "PYTHONPATH": "/var/task:/var/task/gnosis_predict_market_tool"
   }
