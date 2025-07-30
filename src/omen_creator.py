@@ -1,61 +1,26 @@
-import subprocess
 import logging
-import shlex
-import os
-import sys
 import re
 import json
 from datetime import datetime, timedelta, timezone
 from .config import Config
+from .blockchain.market_creator import create_omen_market as blockchain_create_market
+from .blockchain.types import MarketCreationResult
 
 logging.basicConfig(level=logging.INFO)
 
-def create_omen_market(application_details: dict) -> tuple[bool, str]:
+def create_omen_market(application_details: dict) -> tuple[bool, str | MarketCreationResult]:
     """
-    Creates a prediction market on Omen by executing an external script.
+    Creates a prediction market on Omen using direct blockchain interaction.
 
     Args:
         application_details: A dictionary containing details about the application,
                              including project_name, program_name, and deadline.
 
     Returns:
-        A tuple containing a boolean success status and the output message.
+        A tuple containing a boolean success status and either an error message (str) 
+        or the MarketCreationResult object for successful creation.
     """
-    poetry_executable_path = Config.POETRY_PATH
-    project_path = Config.OMEN_SCRIPT_PROJECT_PATH
-
-    # --- Step 1: Ensure dependencies are installed in the script's project ---
-    try:
-        logging.info(f"Ensuring dependencies are installed in '{project_path}'...")
-        install_command = [
-            "/bin/sh",
-            poetry_executable_path,
-            "install",
-        ]
-        install_result = subprocess.run(
-            install_command,
-            cwd=project_path,
-            capture_output=True,
-            text=True,
-            check=True,
-            encoding='utf-8'
-        )
-        logging.info(f"Dependency installation check in '{project_path}' completed.")
-        # Optionally log stdout for debugging: logging.debug(f"Poetry install stdout: {install_result.stdout}")
-    except subprocess.CalledProcessError as e:
-        error_message = (
-            f"Failed to install poetry dependencies in '{project_path}'. Exit code: {e.returncode}.\n"
-            f"Stderr: {e.stderr}\n"
-            f"Stdout: {e.stdout}"
-        )
-        logging.error(error_message)
-        return False, error_message
-    except FileNotFoundError as e:
-        error_message = f"Subprocess error during dependency installation: Could not execute '{e.filename}'. Full error: {e}"
-        logging.error(error_message)
-        return False, error_message
-
-    # --- Step 2: Prepare and run the market creation script ---
+    # --- Prepare market creation parameters ---
     project_name = application_details.get("project_name")
     project_description = application_details.get("project_description", "")
     program_description = application_details.get("program_description", "")
@@ -84,68 +49,55 @@ def create_omen_market(application_details: dict) -> tuple[bool, str]:
     # 2. Determine the closing time
     deadline_str = application_details.get("deadline")
     if deadline_str:
-        closing_time = datetime.fromisoformat(deadline_str).strftime("%Y-%m-%dT%H:%M:%S")
+        closing_time = datetime.fromisoformat(deadline_str)
     else:
         # Default to 30 days from now if no deadline is specified
-        closing_time = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S")
+        closing_time = datetime.now(timezone.utc) + timedelta(days=30)
 
-    # 3. Construct the command
-    command = [
-        "/bin/sh",
-        poetry_executable_path,
-        "run",
-        "python",
-        "scripts/create_market_omen.py",
-        "--question", question,
-        "--closing-time", closing_time,
-        "--category", "supafund",
-        "--initial-funds-usd", "0.01",
-        "--cl-token", "wxdai",
-        "--from-private-key", Config.OMEN_PRIVATE_KEY,
-    ]
+    # Ensure closing_time has timezone info
+    if closing_time.tzinfo is None:
+        closing_time = closing_time.replace(tzinfo=timezone.utc)
 
-    logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
-
-    # 4. Execute the command
+    # 3. Create market using direct blockchain interaction
     try:
-        logging.info(f"Executing command in directory: {project_path}")
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True,
-            encoding='utf-8',
-            cwd=project_path
-        )
-        logging.info(f"Omen market creation successful. Output:\n{result.stdout}")
-        return True, result.stdout
-
-    except FileNotFoundError as e:
-        error_message = f"Subprocess error: File not found. The system failed to execute '{e.filename}'. This could be an issue with the file itself, its path, or its interpreter's dependencies. Full error: {e}"
-        logging.error(error_message)
-        return False, error_message
+        logging.info(f"Creating market with question: {question}")
+        logging.info(f"Closing time: {closing_time}")
         
-    except subprocess.CalledProcessError as e:
-        error_message = (
-            f"Omen market creation failed with exit code {e.returncode}.\n"
-            f"Stderr: {e.stderr}\n"
-            f"Stdout: {e.stdout}"
+        # Use the new blockchain module
+        result = blockchain_create_market(
+            question=question,
+            closing_time=closing_time,
+            category="supafund",
+            initial_funds_usd="0.01",
+            from_private_key=Config.OMEN_PRIVATE_KEY,
+            collateral_token="wxdai",
+            auto_deposit=True
         )
-        logging.error(error_message)
-        return False, error_message
         
+        if result.success:
+            logging.info(f"Omen market creation successful.")
+            logging.info(f"Market ID: {result.market_id}")
+            logging.info(f"Market URL: {result.market_url}")
+            logging.info(f"Transaction Hash: {result.transaction_hash}")
+            # Return the structured result object instead of text
+            return True, result
+        else:
+            error_message = f"Market creation failed: {result.error_message}"
+            logging.error(error_message)
+            return False, error_message
+            
     except Exception as e:
         error_message = f"An unexpected error occurred: {e}"
         logging.error(error_message)
         return False, str(e)
 
 
-def parse_market_output(output: str) -> dict:
+def parse_market_output(output) -> dict:
     """
-    Parse the output from Omen market creation script to extract market information.
+    Parse the output from Omen market creation to extract market information.
     
     Args:
-        output: Raw output string from the market creation script
+        output: Either a MarketCreationResult object or raw output string from the market creation
         
     Returns:
         Dictionary containing extracted market information
@@ -157,17 +109,40 @@ def parse_market_output(output: str) -> dict:
         "market_question": "",
         "closing_time": None,
         "initial_funds_usd": 0.01,
-        "creation_timestamp": datetime.now(timezone.utc).isoformat()
+        "creation_timestamp": datetime.now(timezone.utc).isoformat(),
+        "transaction_hash": None
     }
     
     try:
+        # If output is a MarketCreationResult object, extract data directly
+        if isinstance(output, MarketCreationResult):
+            market_info["market_id"] = output.market_id or ""
+            market_info["market_url"] = output.market_url or ""
+            market_info["transaction_hash"] = output.transaction_hash or ""
+            
+            # Extract question from raw_output if available
+            if output.raw_output and "question:" in output.raw_output.lower():
+                question_match = re.search(r"question[:\s]*([^\n]+)", output.raw_output, re.IGNORECASE)
+                if question_match:
+                    market_info["market_question"] = question_match.group(1).strip()
+            
+            # Generate market title from question or use a default
+            if market_info["market_question"]:
+                market_info["market_title"] = market_info["market_question"][:100] + "..." if len(market_info["market_question"]) > 100 else market_info["market_question"]
+            else:
+                market_info["market_title"] = f"Prediction Market {market_info['market_id'][:8]}..."
+            
+            logging.info(f"Parsed market info from MarketCreationResult: {market_info}")
+            return market_info
+        
+        # Fallback: Parse from string output (original logic)
         # Try to find market ID in the output
         # Common patterns for market ID extraction
         market_id_patterns = [
+            r"Market ID:\s*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
             r"market[_\s]id[:\s]*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
             r"created[_\s]market[:\s]*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
             r"address[:\s]*([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
-            r"Market ID: ([0-9a-fA-F]{40}|0x[0-9a-fA-F]{40})",
         ]
         
         for pattern in market_id_patterns:
@@ -180,6 +155,7 @@ def parse_market_output(output: str) -> dict:
         
         # Try to find market URL
         url_patterns = [
+            r"Market URL:\s*(https?://[^\s]+)",
             r"https?://[^\s]+omen[^\s]*market[^\s]*",
             r"https?://omen\.eth\.limo/[^\s]*",
             r"https?://[^\s]*omen[^\s]*"
@@ -188,7 +164,7 @@ def parse_market_output(output: str) -> dict:
         for pattern in url_patterns:
             match = re.search(pattern, output, re.IGNORECASE)
             if match:
-                market_info["market_url"] = match.group(0)
+                market_info["market_url"] = match.group(1) if len(match.groups()) > 0 else match.group(0)
                 break
         
         # Extract question if visible in output
@@ -231,10 +207,13 @@ def parse_market_output(output: str) -> dict:
         if market_info["market_question"]:
             market_info["market_title"] = market_info["market_question"][:100] + "..." if len(market_info["market_question"]) > 100 else market_info["market_question"]
         
-        logging.info(f"Parsed market info: {market_info}")
+        logging.info(f"Parsed market info from string: {market_info}")
         
     except Exception as e:
         logging.error(f"Error parsing market output: {e}")
-        logging.debug(f"Raw output: {output}")
+        if hasattr(output, '__dict__'):
+            logging.debug(f"MarketCreationResult object: {output.__dict__}")
+        else:
+            logging.debug(f"Raw output: {output}")
     
     return market_info
