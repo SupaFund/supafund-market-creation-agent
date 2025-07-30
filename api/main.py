@@ -27,7 +27,7 @@ logger.info(f"Added gnosis tool to path: {gnosis_tool_path}")
 
 try:
     # Import the FastAPI app from src/main.py  
-    from main import app
+    from src.main import app
     logger.info("Successfully imported FastAPI app")
     
     # Add a simple health check to test if the app is working
