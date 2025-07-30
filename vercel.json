@@ -3,7 +3,7 @@
     "api/main.py": {
       "runtime": "@vercel/python",
       "maxDuration": 300,
-      "memory": 3008
+      "memory": 2048
     }
   },
   "routes": [
