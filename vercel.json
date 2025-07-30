@@ -1,7 +1,8 @@
 {
+  "version": 2,
   "functions": {
-    "api/main.py": {
-      "runtime": "python@3.9",
+    "api/*.py": {
+      "runtime": "@vercel/python@4.13.0",
       "maxDuration": 300,
       "memory": 2048
     }
