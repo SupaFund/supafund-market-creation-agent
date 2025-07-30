@@ -1,18 +1,4 @@
 {
-  "version": 2,
-  "functions": {
-    "api/*.py": {
-      "runtime": "@vercel/python@4.13.0",
-      "maxDuration": 300,
-      "memory": 2048
-    }
-  },
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "api/main.py"
-    }
-  ],
   "env": {
     "PYTHONPATH": "/var/task:/var/task/gnosis_predict_market_tool"
   }

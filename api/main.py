@@ -57,16 +57,10 @@ except Exception as e:
             "status": "error",
             "message": f"Failed to import main app: {str(e)}",
             "python_path": sys.path[:5],  # Show first 5 entries
-            "current_dir": current_dir,
+            "current_dir": current_dir if 'current_dir' in locals() else "undefined",
             "src_dir": src_dir if 'src_dir' in locals() else "undefined",
             "gnosis_tool_path": gnosis_tool_path if 'gnosis_tool_path' in locals() else "undefined"
         }
 
-# Export the app directly for Vercel's Python runtime
-# Vercel will automatically handle ASGI/WSGI requests
-
-# For direct import compatibility
-if __name__ == "__main__":
-    import uvicorn
-    # This allows local testing with: python api/main.py
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# Export the app variable for Vercel's Python runtime (ASGI support)
+# This is the key change - Vercel looks for 'app' variable for ASGI applications
