@@ -1,0 +1,30 @@
+# Testing and development files
+tests/
+logs/
+*.md
+*.log
+database_migrations/
+scripts/
+.git/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Gnosis tool - only exclude non-essential parts
+gnosis_predict_market_tool/tests/
+gnosis_predict_market_tool/tests_integration/
+gnosis_predict_market_tool/tests_integration_with_local_chain/
+gnosis_predict_market_tool/docs/
+gnosis_predict_market_tool/examples/
+gnosis_predict_market_tool/assets/
+gnosis_predict_market_tool/*.md
+gnosis_predict_market_tool/*.yaml
+gnosis_predict_market_tool/*.ini
+gnosis_predict_market_tool/*.lock
+gnosis_predict_market_tool/install_hooks.sh
+
+# Other files
+requirements-serverless.txt
+.env.example
+deployment-checklist.md
+VERCEL_DEPLOYMENT_GUIDE.md
