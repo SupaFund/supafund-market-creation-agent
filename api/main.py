@@ -72,6 +72,10 @@ except ImportError as e:
     @app.get("/health")
     async def health_error():
         return {"status": "error", "message": "App failed to start properly"}
+    
+    # Create handler for fallback app too
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
 
 except Exception as e:
     logger.error(f"Unexpected error: {e}")
@@ -88,5 +92,13 @@ except Exception as e:
             "message": f"Unexpected error: {str(e)}",
             "error_type": type(e).__name__
         }
+    
+    # Create handler for fallback app too
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
 
 # Export the app variable for Vercel
+# For Vercel, we need to create a handler that works with their serverless functions
+if 'handler' not in locals():
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
