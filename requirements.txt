@@ -35,6 +35,7 @@ eth-keys>=0.6.1
 types-cachetools>=5.5.0
 cowdao-cowpy>=1.0.0rc5
 sqlmodel>=0.0.22
+Pillow>=9.0.0
 
 # Light ML dependencies (only what's actually needed)
 numpy>=1.26.4
