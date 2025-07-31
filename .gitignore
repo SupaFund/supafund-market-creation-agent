@@ -6,3 +6,8 @@
 /tests/integration/__pycache__
 /tests/performance/__pycache__
 /tests/e2e/__pycache__
+tests/.DS_Store
+gnosis_predict_market_tool/.DS_Store
+src/.DS_Store
+.DS_Store
+.env
