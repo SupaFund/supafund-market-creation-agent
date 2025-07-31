@@ -29,7 +29,22 @@ class ResolutionLogger:
     
     def __init__(self, log_dir: str = None):
         self.log_dir = Path(log_dir or f"{Config.PROJECT_ROOT}/logs")
-        self.log_dir.mkdir(exist_ok=True)
+        
+        # Handle serverless/read-only filesystem - use /tmp if logs directory can't be created
+        try:
+            self.log_dir.mkdir(exist_ok=True)
+            self.filesystem_writable = True
+        except (OSError, PermissionError) as e:
+            # Fallback to /tmp for serverless environments
+            import tempfile
+            self.log_dir = Path(tempfile.gettempdir()) / "market_logs"
+            try:
+                self.log_dir.mkdir(exist_ok=True)
+                self.filesystem_writable = True
+            except (OSError, PermissionError):
+                # If even /tmp doesn't work, disable file logging
+                self.filesystem_writable = False
+                logging.warning(f"File logging disabled due to read-only filesystem: {e}")
         
         # Set up different log files
         self.operations_log = self.log_dir / "resolution_operations.log"
@@ -51,23 +66,41 @@ class ResolutionLogger:
         self.operations_logger = logging.getLogger("resolution_operations")
         self.operations_logger.setLevel(logging.INFO)
         
-        operations_handler = logging.FileHandler(self.operations_log)
-        operations_formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'
-        )
-        operations_handler.setFormatter(operations_formatter)
-        self.operations_logger.addHandler(operations_handler)
+        if self.filesystem_writable:
+            operations_handler = logging.FileHandler(self.operations_log)
+            operations_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            )
+            operations_handler.setFormatter(operations_formatter)
+            self.operations_logger.addHandler(operations_handler)
+        else:
+            # Add console handler if file logging is not available
+            console_handler = logging.StreamHandler()
+            operations_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            )
+            console_handler.setFormatter(operations_formatter)
+            self.operations_logger.addHandler(console_handler)
         
         # Errors logger
         self.errors_logger = logging.getLogger("resolution_errors")
         self.errors_logger.setLevel(logging.ERROR)
         
-        errors_handler = logging.FileHandler(self.errors_log)
-        errors_formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
-        )
-        errors_handler.setFormatter(errors_formatter)
-        self.errors_logger.addHandler(errors_handler)
+        if self.filesystem_writable:
+            errors_handler = logging.FileHandler(self.errors_log)
+            errors_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+            )
+            errors_handler.setFormatter(errors_formatter)
+            self.errors_logger.addHandler(errors_handler)
+        else:
+            # Add console handler if file logging is not available
+            console_handler = logging.StreamHandler()
+            errors_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+            )
+            console_handler.setFormatter(errors_formatter)
+            self.errors_logger.addHandler(console_handler)
     
     def log_operation_start(self, operation: str, market_id: str, application_id: str, details: Dict = None) -> str:
         """
@@ -362,6 +395,10 @@ class ResolutionLogger:
             file_path: Path to JSONL file
             data: Data to write
         """
+        if not self.filesystem_writable:
+            # Skip file writing in serverless environments
+            return
+            
         try:
             with open(file_path, 'a', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False)

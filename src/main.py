@@ -8,8 +8,6 @@ from .supabase_client import get_application_details, check_existing_market, cre
 from .omen_creator import create_omen_market, parse_market_output
 from .omen_betting import place_bet
 from .vercel_logger import market_logger
-from .daily_scheduler import run_daily_resolution
-from .resolution_logger import resolution_logger
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -458,6 +456,9 @@ async def trigger_daily_resolution(background_tasks: BackgroundTasks):
     This runs in the background to avoid request timeout.
     """
     try:
+        # Lazy import to avoid startup issues
+        from .daily_scheduler import run_daily_resolution
+        
         # Run the resolution cycle in the background
         background_tasks.add_task(run_daily_resolution)
         
@@ -481,6 +482,9 @@ async def get_resolution_status():
     Get the current status and recent activity of the resolution system.
     """
     try:
+        # Lazy import to avoid startup issues
+        from .resolution_logger import resolution_logger
+        
         # Get recent logs from resolution logger
         recent_errors = resolution_logger.get_recent_errors(hours=24)
         recent_operations = resolution_logger.get_operation_logs()
@@ -534,6 +538,9 @@ async def get_resolution_logs(market_id: str = None, operation: str = None, limi
         limit: Maximum number of logs to return
     """
     try:
+        # Lazy import to avoid startup issues
+        from .resolution_logger import resolution_logger
+        
         logs = resolution_logger.get_operation_logs(market_id=market_id, operation=operation)
         
         # Limit results
@@ -565,6 +572,9 @@ async def get_resolution_summary():
     Get a summary of resolution operations and generate daily summary.
     """
     try:
+        # Lazy import to avoid startup issues
+        from .resolution_logger import resolution_logger
+        
         summary = resolution_logger.generate_daily_summary()
         
         return {
@@ -662,14 +672,19 @@ async def research_market_resolution(request: ResearchMarketRequest):
             )
         
         # Log the research result
-        resolution_logger.log_resolution_research_result(
-            request.market_id,
-            request.application_id,
-            result.outcome,
-            result.confidence,
-            result.reasoning,
-            result.sources
-        )
+        try:
+            from .resolution_logger import resolution_logger
+            resolution_logger.log_resolution_research_result(
+                request.market_id,
+                request.application_id,
+                result.outcome,
+                result.confidence,
+                result.reasoning,
+                result.sources
+            )
+        except ImportError:
+            # Continue without logging if resolution_logger can't be imported
+            pass
         
         return {
             "status": "success",
@@ -737,14 +752,19 @@ async def research_and_submit_market_answer(request: ResearchMarketRequest):
         logger.info(f"📊 Grok research completed: {research_result.outcome} (confidence: {research_result.confidence})")
         
         # Step 4: Log the research result
-        resolution_logger.log_resolution_research_result(
-            request.market_id,
-            request.application_id,
-            research_result.outcome,
-            research_result.confidence,
-            research_result.reasoning,
-            research_result.sources
-        )
+        try:
+            from .resolution_logger import resolution_logger
+            resolution_logger.log_resolution_research_result(
+                request.market_id,
+                request.application_id,
+                research_result.outcome,
+                research_result.confidence,
+                research_result.reasoning,
+                research_result.sources
+            )
+        except ImportError:
+            # Continue without logging if resolution_logger can't be imported
+            pass
         
         # Step 5: Convert "Invalid" to "No" for blockchain submission
         # In funding program context: no evidence of acceptance = "No" 
