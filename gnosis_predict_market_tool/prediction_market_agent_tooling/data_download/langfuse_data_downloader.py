@@ -5,8 +5,15 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 import typer
+
+# Conditional import for serverless environments
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
 from langfuse import Langfuse
 from langfuse.client import TraceWithDetails
 from pydantic import BaseModel
@@ -128,8 +135,15 @@ def download_data_daily(
         logger.info(f"No traces found for {date_from.date()}")
         # If this is the first call and no traces, create empty CSV with header
         if not append_mode:
-            df_empty = pd.DataFrame(columns=list(TraceResult.model_fields.keys()))
-            df_empty.to_csv(output_file, mode="w", header=True, index=False)
+            if PANDAS_AVAILABLE:
+                df_empty = pd.DataFrame(columns=list(TraceResult.model_fields.keys()))
+                df_empty.to_csv(output_file, mode="w", header=True, index=False)
+            else:
+                # Fallback: create CSV with headers manually
+                import csv
+                with open(output_file, 'w', newline='') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=list(TraceResult.model_fields.keys()))
+                    writer.writeheader()
         return 0, 0
 
     # Use ThreadPoolExecutor with shared client (thread-safe)
@@ -156,18 +170,37 @@ def download_data_daily(
     successful_results = [r for r in results if r is not None]
     if successful_results:
         results_data = [result.model_dump() for result in successful_results]
-        df = pd.DataFrame(results_data)
-
-        df.to_csv(
-            output_file,
-            mode="a" if append_mode else "w",
-            header=not append_mode,
-            index=False,
-        )
+        
+        if PANDAS_AVAILABLE:
+            df = pd.DataFrame(results_data)
+            df.to_csv(
+                output_file,
+                mode="a" if append_mode else "w",
+                header=not append_mode,
+                index=False,
+            )
+        else:
+            # Fallback: write CSV manually
+            import csv
+            fieldnames = list(TraceResult.model_fields.keys())
+            
+            with open(output_file, "a" if append_mode else "w", newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                if not append_mode:
+                    writer.writeheader()
+                writer.writerows(results_data)
+        
         logger.info(f"Saved {len(successful_results)} records for {date_from.date()}")
     elif not append_mode:
-        df_empty = pd.DataFrame(columns=list(TraceResult.model_fields.keys()))
-        df_empty.to_csv(output_file, mode="w", header=True, index=False)
+        if PANDAS_AVAILABLE:
+            df_empty = pd.DataFrame(columns=list(TraceResult.model_fields.keys()))
+            df_empty.to_csv(output_file, mode="w", header=True, index=False)
+        else:
+            # Fallback: create CSV with headers manually
+            import csv
+            with open(output_file, 'w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=list(TraceResult.model_fields.keys()))
+                writer.writeheader()
 
     return traces_count, len(successful_results)
 

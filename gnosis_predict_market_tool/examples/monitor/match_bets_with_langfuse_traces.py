@@ -3,8 +3,15 @@ from datetime import timedelta
 from pathlib import Path
 
 import optuna
-import pandas as pd
 import tenacity
+
+# Conditional imports for serverless environments  
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
 from eth_typing import HexAddress, HexStr
 from langfuse import Langfuse
 from pydantic import BaseModel
@@ -543,14 +550,17 @@ def main() -> None:
         print(f"Total original profit: {total_original_profit}")
         print()
 
-        simulations_df = pd.DataFrame.from_records(
-            [trial.user_attrs["metrics_dict"] for trial in last_study.trials]
-        )
-        simulations_df.sort_values(by="maximize", ascending=False, inplace=True)
-        overall_md += (
-            f"\n\n## {agent_name}\n\n{len(bets_with_traces)} bets\n\n"
-            + simulations_df.to_markdown(index=False)
-        )
+        if PANDAS_AVAILABLE:
+            simulations_df = pd.DataFrame.from_records(
+                [trial.user_attrs["metrics_dict"] for trial in last_study.trials]
+            )
+            simulations_df.sort_values(by="maximize", ascending=False, inplace=True)
+            overall_md += (
+                f"\n\n## {agent_name}\n\n{len(bets_with_traces)} bets\n\n"
+                + simulations_df.to_markdown(index=False)
+            )
+        else:
+            overall_md += f"\n\n## {agent_name}\n\n{len(bets_with_traces)} bets\n\nDataFrame generation requires pandas library."
 
         with open(
             output_directory / "match_bets_with_langfuse_traces_overall.md", "w"

@@ -1,4 +1,4 @@
-import pandas as pd
+import csv
 import typer
 from web3 import Web3
 
@@ -45,26 +45,39 @@ def main(
         --from-private-key your-private-key
     ```
     """
-    data = pd.read_csv(path)
+    # Read CSV data using built-in csv module
+    data_rows = []
+    with open(path, 'r', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        columns = reader.fieldnames or []
+        
+        # Check required columns
+        required_columns = [QUESTION_COLUMN, CLOSING_DATE_COLUMN]
+        if not all(column in columns for column in required_columns):
+            missing_cols = [col for col in required_columns if col not in columns]
+            raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
+        
+        # Process rows
+        for row in reader:
+            # Skip rows with missing questions
+            question = row.get(QUESTION_COLUMN, '').strip()
+            if not question:
+                continue
+                
+            # Parse closing date
+            try:
+                closing_date = DatetimeUTC.to_datetime_utc(row[CLOSING_DATE_COLUMN])
+                data_rows.append({
+                    QUESTION_COLUMN: question,
+                    CLOSING_DATE_COLUMN: closing_date
+                })
+            except Exception as e:
+                logger.warning(f"Failed to parse date for question '{question}': {e}")
+                continue
 
-    required_columns = [QUESTION_COLUMN, CLOSING_DATE_COLUMN]
-    if not all(column in data.columns for column in required_columns):
-        missing_cols = [col for col in required_columns if col not in data.columns]
-        raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
-
-    # Remove potential missing markets.
-    data = data[data[QUESTION_COLUMN].notnull()]
-    # Sanitize questions.
-    data[QUESTION_COLUMN] = data[QUESTION_COLUMN].apply(lambda x: x.strip())
-    # Remove empty strings.
-    data = data[data[QUESTION_COLUMN] != ""]
-    # Parse closing dates using DatetimeUTC.
-    data[CLOSING_DATE_COLUMN] = data[CLOSING_DATE_COLUMN].apply(
-        lambda x: DatetimeUTC.to_datetime_utc(x)
-    )
-
-    logger.info(f"Will create {len(data)} markets:")
-    logger.info(data)
+    logger.info(f"Will create {len(data_rows)} markets:")
+    for row in data_rows:
+        logger.info(f"Question: {row[QUESTION_COLUMN]}, Closing: {row[CLOSING_DATE_COLUMN]}")
 
     safe_address_checksum = (
         Web3.to_checksum_address(safe_address) if safe_address else None
@@ -74,7 +87,7 @@ def main(
         SAFE_ADDRESS=safe_address_checksum,
     )
 
-    for _, row in data.iterrows():
+    for row in data_rows:
         logger.info(
             f"Going to create `{row[QUESTION_COLUMN]}` with closing time `{row[CLOSING_DATE_COLUMN]}`."
         )

@@ -4,9 +4,23 @@ import typing as t
 from collections import defaultdict
 
 import numpy as np
-import pandas as pd
-from sklearn.metrics import precision_score, recall_score
 from tqdm import tqdm
+
+# Conditional imports for serverless environments
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
+
+try:
+    from sklearn.metrics import precision_score, recall_score
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    precision_score = None
+    recall_score = None
 
 from prediction_market_agent_tooling.benchmark.agents import AbstractBenchmarkedAgent
 from prediction_market_agent_tooling.benchmark.utils import Prediction, PredictionsCache
@@ -310,11 +324,26 @@ class Benchmarker:
 
         ground_truth = [ground_truth[i] for i in valid_indices]
         y_pred = [y_pred[i] for i in valid_indices]
-        precision = precision_score(
-            ground_truth, y_pred, average="micro", zero_division=0.0
-        )
-        recall = recall_score(ground_truth, y_pred, average="micro", zero_division=0.0)
-        return precision * 100, recall * 100
+        if not SKLEARN_AVAILABLE:
+            # Fallback manual implementation
+            if not ground_truth or not y_pred:
+                return None, None
+            
+            # Simple precision/recall calculation
+            tp = sum(1 for gt, pred in zip(ground_truth, y_pred) if gt == 1 and pred == 1)
+            fp = sum(1 for gt, pred in zip(ground_truth, y_pred) if gt == 0 and pred == 1)
+            fn = sum(1 for gt, pred in zip(ground_truth, y_pred) if gt == 1 and pred == 0)
+            
+            precision = (tp / (tp + fp)) * 100 if (tp + fp) > 0 else 0.0
+            recall = (tp / (tp + fn)) * 100 if (tp + fn) > 0 else 0.0
+        else:
+            precision = precision_score(
+                ground_truth, y_pred, average="micro", zero_division=0.0
+            )
+            recall = recall_score(ground_truth, y_pred, average="micro", zero_division=0.0)
+            precision *= 100
+            recall *= 100
+        return precision, recall
 
     def _compute_confidence_p_yes_error_correlation(
         self, predictions: t.List[Prediction], markets: t.Sequence[AgentMarket]
@@ -446,6 +475,9 @@ class Benchmarker:
         }
 
     def generate_markdown_report(self) -> str:
+        if not PANDAS_AVAILABLE:
+            return "# Comparison Report\n\nReport generation requires pandas library, which is not available in this environment."
+        
         md = "# Comparison Report\n\n"
         md += "## Market Results\n\n"
         md += pd.DataFrame(self.get_markets_results()).to_markdown(index=False)
