@@ -10,5 +10,21 @@
       "src": "/(.*)",
       "dest": "api/main.py"
     }
+  ],
+  "functions": {
+    "api/main.py": {
+      "maxDuration": 10
+    }
+  },
+  "excludeFiles": [
+    "**/*.pyc",
+    "**/__pycache__/**",
+    ".env",
+    ".git/**",
+    ".venv/**",
+    "tests/**",
+    "*.md",
+    "logs/**",
+    ".gitignore"
   ]
 }
