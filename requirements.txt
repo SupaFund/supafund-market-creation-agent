@@ -28,7 +28,11 @@ base58>=1.0.2,<2.0
 tqdm>=4.66.2
 google-cloud-functions>=1.16.0
 google-cloud-secret-manager>=2.18.2
-
+loky>=3.4.1
+pinatapy-vourhey>=0.2.0
+hishel>=0.0.31
+eth-keys>=0.6.1
+types-cachetools>=5.5.0
 # Light ML dependencies (only what's actually needed)
 numpy>=1.26.4
 
