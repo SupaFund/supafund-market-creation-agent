@@ -1,0 +1,77 @@
+# Git and version control
+.git
+.gitignore
+*.md
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Development and documentation
+tests/
+test/
+docs/
+*.log
+*.jsonl
+logs/
+.env.example
+.env.local
+.env.development
+.env.test
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database migrations (not needed in container)
+database_migrations/
+
+# Scripts (not needed in production)
+scripts/
+setup_check.sh
+
+# Large test data
+gnosis_predict_market_tool/tests/
+gnosis_predict_market_tool/tests_integration/
+gnosis_predict_market_tool/tests_integration_with_local_chain/
+gnosis_predict_market_tool/examples/
+gnosis_predict_market_tool/docs/
+gnosis_predict_market_tool/benchmark/
+gnosis_predict_market_tool/data_download/
+
+# Vercel specific (not needed for AWS)
+vercel.json
+api/

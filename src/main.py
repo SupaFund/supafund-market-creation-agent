@@ -68,6 +68,49 @@ async def read_root():
     return {"status": "ok", "message": "Supafund Market Creation Agent is running."}
 
 
+@app.get("/health", tags=["Health Check"])
+async def health_check():
+    """
+    Detailed health check endpoint for AWS App Runner.
+    """
+    try:
+        # Check basic functionality
+        current_time = datetime.now(timezone.utc).isoformat()
+        
+        # Basic system checks
+        import sys
+        import os
+        
+        health_status = {
+            "status": "healthy",
+            "timestamp": current_time,
+            "service": "Supafund Market Creation Agent",
+            "version": "1.0.0",
+            "python_version": sys.version.split()[0],
+            "environment": {
+                "pythonpath_set": "PYTHONPATH" in os.environ,
+                "gnosis_tool_available": os.path.exists("gnosis_predict_market_tool"),
+            }
+        }
+        
+        # Check if critical modules can be imported
+        try:
+            from .blockchain.market_creator import create_omen_market
+            health_status["blockchain_module"] = "available"
+        except Exception as e:
+            health_status["blockchain_module"] = f"error: {str(e)}"
+            
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail={
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+
 @app.post("/create-market", tags=["Market Creation"])
 async def handle_create_market(request: MarketCreationRequest):
     """
