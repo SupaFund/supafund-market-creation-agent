@@ -13,7 +13,6 @@ import time
 
 from .market_monitor import MarketMonitor
 from .resolution_researcher import GrokResolutionResearcher
-from .blockchain.resolution import submit_market_answer
 from .resolution_logger import resolution_logger
 from .supabase_client import get_supabase_client
 
@@ -471,7 +470,17 @@ class DailyResolutionScheduler:
             # Import config to get private key
             from .config import Config
             
-            # Use new blockchain resolution system
+            # Lazy import blockchain functionality
+            try:
+                from .blockchain.resolution import submit_market_answer
+            except ImportError as e:
+                logger.error(f"Failed to import blockchain module: {e}")
+                await self._send_error_notification(
+                    f"Blockchain import failed for market {market_status.market_id}: {e}"
+                )
+                return
+            
+            # Use blockchain resolution system
             submission_result = submit_market_answer(
                 market_id=market_status.market_id,
                 outcome=resolution_result.outcome,
@@ -564,9 +573,15 @@ class DailyResolutionScheduler:
                 )
                 
                 try:
-                    # Use new blockchain resolution system for finalization
-                    from .blockchain.resolution import resolve_market_final, check_market_resolution_status
+                    # Use blockchain resolution system for finalization
                     from .config import Config
+                    
+                    # Lazy import blockchain functionality
+                    try:
+                        from .blockchain.resolution import resolve_market_final, check_market_resolution_status
+                    except ImportError as e:
+                        logger.error(f"Failed to import blockchain resolution modules: {e}")
+                        return
                     
                     # Check if market needs finalization
                     success, check_message, status_info = check_market_resolution_status(

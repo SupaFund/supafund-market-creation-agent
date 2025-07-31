@@ -3,12 +3,10 @@ import re
 import json
 from datetime import datetime, timedelta, timezone
 from .config import Config
-from .blockchain.market_creator import create_omen_market as blockchain_create_market
-from .blockchain.types import MarketCreationResult
 
 logging.basicConfig(level=logging.INFO)
 
-def create_omen_market(application_details: dict) -> tuple[bool, str | MarketCreationResult]:
+def create_omen_market(application_details: dict) -> tuple[bool, str | dict]:
     """
     Creates a prediction market on Omen using direct blockchain interaction.
 
@@ -18,7 +16,7 @@ def create_omen_market(application_details: dict) -> tuple[bool, str | MarketCre
 
     Returns:
         A tuple containing a boolean success status and either an error message (str) 
-        or the MarketCreationResult object for successful creation.
+        or the market creation result dictionary for successful creation.
     """
     # --- Prepare market creation parameters ---
     project_name = application_details.get("project_name")
@@ -63,7 +61,14 @@ def create_omen_market(application_details: dict) -> tuple[bool, str | MarketCre
         logging.info(f"Creating market with question: {question}")
         logging.info(f"Closing time: {closing_time}")
         
-        # Use the new blockchain module
+        # Lazy import to avoid loading blockchain dependencies at startup
+        try:
+            from .blockchain.market_creator import create_omen_market as blockchain_create_market
+        except ImportError as e:
+            logging.error(f"Failed to import blockchain module: {e}")
+            return False, f"Blockchain functionality not available: {e}"
+        
+        # Use the blockchain module
         result = blockchain_create_market(
             question=question,
             closing_time=closing_time,

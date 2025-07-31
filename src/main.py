@@ -10,7 +10,6 @@ from .omen_betting import place_bet
 from .vercel_logger import market_logger
 from .daily_scheduler import run_daily_resolution
 from .resolution_logger import resolution_logger
-from .blockchain.resolution import submit_market_answer, resolve_market_final, check_market_resolution_status
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -758,6 +757,17 @@ async def research_and_submit_market_answer(request: ResearchMarketRequest):
         # Step 6: Auto-submit answer to Reality.eth with default 0.01 xDai bond
         logger.info(f"🔗 Auto-submitting answer to Reality.eth: {blockchain_outcome}")
         
+        # Lazy import blockchain functionality
+        try:
+            from .blockchain.resolution import submit_market_answer
+        except ImportError as e:
+            logger.error(f"Failed to import blockchain module: {e}")
+            return {
+                "success": False,
+                "error": f"Blockchain functionality not available: {e}",
+                "research_result": research_result.dict()
+            }
+        
         submission_result = submit_market_answer(
             market_id=request.market_id,
             outcome=blockchain_outcome,  # Use converted outcome
@@ -870,6 +880,16 @@ async def submit_market_answer_endpoint(request: SubmitAnswerRequest):
         logger.info(f"Outcome: {request.outcome}, Confidence: {request.confidence}")
         
         # Submit the answer using the real blockchain resolution module
+        # Lazy import blockchain functionality
+        try:
+            from .blockchain.resolution import submit_market_answer
+        except ImportError as e:
+            logger.error(f"Failed to import blockchain module: {e}")
+            return {
+                "success": False,
+                "error": f"Blockchain functionality not available: {e}"
+            }
+        
         result = submit_market_answer(
             market_id=request.market_id,
             outcome=request.outcome,
@@ -957,6 +977,16 @@ async def finalize_market_resolution_endpoint(request: FinalizeResolutionRequest
         logger.info(f"Received finalization request for market {request.market_id}")
         
         # Finalize the market resolution using the real blockchain resolution module
+        # Lazy import blockchain functionality
+        try:
+            from .blockchain.resolution import resolve_market_final
+        except ImportError as e:
+            logger.error(f"Failed to import blockchain module: {e}")
+            return {
+                "success": False,
+                "error": f"Blockchain functionality not available: {e}"
+            }
+        
         result = resolve_market_final(
             market_id=request.market_id,
             from_private_key=request.from_private_key,
@@ -1037,6 +1067,16 @@ async def get_market_resolution_status(market_id: str, from_private_key: str = N
         logger.info(f"Checking resolution status for market {market_id}")
         
         # Check the market resolution status using the real blockchain resolution module
+        # Lazy import blockchain functionality
+        try:
+            from .blockchain.resolution import check_market_resolution_status
+        except ImportError as e:
+            logger.error(f"Failed to import blockchain module: {e}")
+            return {
+                "success": False,
+                "error": f"Blockchain functionality not available: {e}"
+            }
+        
         success, message, status_info = check_market_resolution_status(
             market_id=market_id,
             from_private_key=from_private_key
