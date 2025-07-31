@@ -1,5 +1,6 @@
 """
 Vercel deployment entry point for the Supafund Market Creation Agent.
+Using Vercel's native FastAPI support (no Mangum needed in 2025).
 """
 import sys
 import os
@@ -24,9 +25,6 @@ sys.path.insert(0, gnosis_tool_path)
 
 logger.info(f"Added src directory to path: {src_dir}")
 logger.info(f"Added gnosis tool to path: {gnosis_tool_path}")
-
-# Initialize app variable
-app = None
 
 try:
     # Import the FastAPI app from src/main.py  
@@ -92,6 +90,4 @@ except Exception as e:
             "error_type": type(e).__name__
         }
 
-# Create the Mangum handler - this is what Vercel will call
-from mangum import Mangum
-handler = Mangum(app, lifespan="off")
+# No Mangum handler needed - Vercel 2025 supports FastAPI natively
