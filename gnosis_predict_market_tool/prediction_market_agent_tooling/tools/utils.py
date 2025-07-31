@@ -7,9 +7,17 @@ from typing import Any, NoReturn, Optional, Type, TypeVar
 import pytz
 import requests
 from pydantic import BaseModel, ValidationError
-from scipy.optimize import newton
-from scipy.stats import entropy
 from tenacity import RetryError
+
+# Conditional imports for serverless environments
+try:
+    from scipy.optimize import newton
+    from scipy.stats import entropy
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+    newton = None
+    entropy = None
 
 from prediction_market_agent_tooling.gtypes import (
     CollateralToken,
@@ -186,6 +194,13 @@ def prob_uncertainty(prob: Probability) -> float:
         - Market's probability is 0.1, so the market is quite certain about NO: prob_uncertainty(0.1) == 0.468
         - Market's probability is 0.95, so the market is quite certain about YES: prob_uncertainty(0.95) == 0.286
     """
+    if not SCIPY_AVAILABLE:
+        # Fallback: manual binary entropy calculation
+        import math
+        if prob <= 0 or prob >= 1:
+            return 0.0
+        return float(-prob * math.log2(prob) - (1 - prob) * math.log2(1 - prob))
+    
     return float(entropy([prob, 1 - prob], base=2))
 
 
@@ -229,7 +244,28 @@ def calculate_sell_amount_in_collateral(
 
         return (first_term * second_term) - total_product
 
-    amount_to_sell = newton(f, 0)
+    if not SCIPY_AVAILABLE:
+        # Fallback: simple approximation using bisection method
+        logger.warning("scipy not available, using approximation for sell amount calculation")
+        
+        # Simple bisection method for finding root
+        low, high = 0.0, float(shares_to_sell.value)
+        tolerance = 1e-6
+        max_iterations = 100
+        
+        for _ in range(max_iterations):
+            mid = (low + high) / 2
+            if abs(f(mid)) < tolerance:
+                break
+            if f(mid) * f(low) < 0:
+                high = mid
+            else:
+                low = mid
+        
+        amount_to_sell = mid
+    else:
+        amount_to_sell = newton(f, 0)
+    
     return CollateralToken(float(amount_to_sell) * 0.999999)  # Avoid rounding errors
 
 

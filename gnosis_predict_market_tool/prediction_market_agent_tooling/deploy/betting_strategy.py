@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from scipy.optimize import minimize_scalar
+# Conditional import for serverless environments
+try:
+    from scipy.optimize import minimize_scalar
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+    minimize_scalar = None
 
 from prediction_market_agent_tooling.benchmark.utils import get_most_probable_outcome
 from prediction_market_agent_tooling.deploy.constants import (
@@ -393,6 +399,12 @@ class KellyBettingStrategy(BettingStrategy):
         pool_balances = [i.as_outcome_wei for i in market.outcome_token_pool.values()]
         # stay float for compatibility with `minimize_scalar`
         total_pool_balance = sum([i.value for i in market.outcome_token_pool.values()])
+
+        if not SCIPY_AVAILABLE:
+            logger.warning(
+                "scipy not available, falling back to Kelly bet size without price impact optimization"
+            )
+            return kelly_bet.size
 
         # The bounds below have been found to work heuristically.
         optimized_bet_amount = minimize_scalar(
