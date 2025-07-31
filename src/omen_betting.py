@@ -1,8 +1,6 @@
 import logging
 from typing import Tuple
 from .config import Config
-from .blockchain.betting import place_omen_bet
-from .blockchain.types import BetResult
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +30,14 @@ def place_bet(
     try:
         logger.info(f"Placing bet on market {market_id} for {amount_usd} USD on outcome {outcome}")
         
-        # Use the real blockchain module to place bet
+        # Lazy import blockchain functionality
+        try:
+            from .blockchain.betting import place_omen_bet
+        except ImportError as e:
+            logger.error(f"Failed to import blockchain betting module: {e}")
+            return False, f"Blockchain betting functionality not available: {e}"
+        
+        # Use the blockchain module to place bet
         result = place_omen_bet(
             market_id=market_id,
             amount_usd=str(amount_usd),

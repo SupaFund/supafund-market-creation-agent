@@ -15,7 +15,6 @@ httpx>=0.25.0
 web3>=6.15.0
 eth-account>=0.8.0,<0.12.0
 eth-typing>=3.0.0
-safe-eth>=6.0.0
 
 # Safe and transaction handling (lighter versions)
 loguru>=0.7.2
