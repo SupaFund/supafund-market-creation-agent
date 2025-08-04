@@ -191,9 +191,16 @@ def create_market_record(application_id: str, market_data: dict) -> bool:
         
         logger.info(f"Creating market record for application {application_id}")
         
+        # Generate a temporary market_id if one is not provided
+        market_id = market_data.get("market_id", "")
+        if not market_id:
+            # Use application_id as temporary market_id to ensure uniqueness
+            market_id = f"PENDING_{application_id}"
+            logger.warning(f"No market_id found in market_data, using temporary ID: {market_id}")
+        
         record = {
             "application_id": application_id,
-            "market_id": market_data.get("market_id", ""),
+            "market_id": market_id,
             "market_title": market_data.get("market_title", ""),
             "market_url": market_data.get("market_url", ""),
             "market_question": market_data.get("market_question", ""),

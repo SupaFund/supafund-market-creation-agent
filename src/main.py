@@ -8,7 +8,7 @@ import json
 from .supabase_client import get_application_details, check_existing_market, create_market_record, get_market_by_application_id, update_market_record
 from .omen_subprocess_creator import create_omen_market
 from .omen_subprocess_betting import place_bet
-from .vercel_logger import market_logger
+from .aws_logger import market_logger
 from .daily_scheduler import run_daily_resolution
 from .resolution_logger import resolution_logger
 from .omen_subprocess_resolution import (

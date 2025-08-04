@@ -1,6 +1,6 @@
 """
-Vercel-compatible logging utility for tracking market operations.
-Replaces file-based logging with stdout/stderr and structured logging for Vercel.
+AWS App Runner compatible logging utility for tracking market operations.
+Replaces file-based logging with stdout/stderr and structured logging for AWS App Runner.
 """
 import json
 import logging
@@ -8,24 +8,24 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
 
-class VercelLogger:
+class AwsAppRunnerLogger:
     """
-    Vercel-compatible logger for market operations that uses stdout/stderr instead of files.
-    All logs are structured JSON for better observability in Vercel.
+    AWS App Runner compatible logger for market operations that uses stdout/stderr instead of files.
+    All logs are structured JSON for better observability in AWS App Runner.
     """
     
     def __init__(self):
-        # Setup structured logging for Vercel
+        # Setup structured logging for AWS App Runner
         self.setup_loggers()
         # In-memory storage for recent logs (limited to prevent memory issues)
         self.recent_logs: List[Dict] = []
         self.max_logs = 1000  # Keep only last 1000 log entries
     
     def setup_loggers(self):
-        """Setup structured loggers for Vercel environment."""
+        """Setup structured loggers for AWS App Runner environment."""
         
         # Market operations logger - outputs to stdout
-        self.market_logger = logging.getLogger('vercel_market_operations')
+        self.market_logger = logging.getLogger('aws_app_runner_market_operations')
         self.market_logger.setLevel(logging.INFO)
         self.market_logger.handlers.clear()
         
@@ -38,7 +38,7 @@ class VercelLogger:
         self.market_logger.addHandler(console_handler)
         
         # Error logger - outputs to stderr
-        self.error_logger = logging.getLogger('vercel_market_errors')
+        self.error_logger = logging.getLogger('aws_app_runner_market_errors')
         self.error_logger.setLevel(logging.ERROR)
         self.error_logger.handlers.clear()
         
@@ -62,7 +62,7 @@ class VercelLogger:
             "operation": operation,
             "application_id": application_id,
             "data": data or {},
-            "environment": "vercel"
+            "environment": "aws_app_runner"
         }
     
     def log_market_request(self, application_id: str, request_data: Dict):
@@ -170,5 +170,5 @@ class VercelLogger:
             if log.get("operation") == operation
         ]
 
-# Create global logger instance for Vercel
-market_logger = VercelLogger()
+# Create global logger instance for AWS App Runner
+market_logger = AwsAppRunnerLogger()

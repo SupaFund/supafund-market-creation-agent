@@ -162,13 +162,26 @@ class OmenSubprocessCreator:
         }
         
         try:
-            # Try to parse as JSON first
-            if output.startswith('{'):
-                market_info.update(json.loads(output))
+            # Look for MARKET_CREATED output from our modified script
+            import re
+            market_created_pattern = r'MARKET_CREATED: (.+)'
+            market_created_match = re.search(market_created_pattern, output)
+            if market_created_match:
+                # Parse the market info dict
+                market_data_str = market_created_match.group(1)
+                # Convert string representation to dict (safely)
+                import ast
+                market_data = ast.literal_eval(market_data_str)
+                market_info.update(market_data)
+                logger.info(f"Successfully parsed market data: {market_data.get('market_id', 'unknown')}")
                 return market_info
             
-            # Extract market ID if present in output
-            import re
+            # Fallback: try to parse as JSON first
+            if output.strip().startswith('{'):
+                market_info.update(json.loads(output.strip()))
+                return market_info
+            
+            # Fallback: Extract market ID if present in output (legacy parsing)
             market_id_pattern = r'market[_\s]*id[:\s]*([0-9a-fA-Fx]+)'
             market_id_match = re.search(market_id_pattern, output, re.IGNORECASE)
             if market_id_match:

@@ -63,6 +63,22 @@ def main(
         auto_deposit=auto_deposit,
     )
     logger.info(f"Market created: {market}")
+    
+    # Output market information to stdout for subprocess parsing
+    market_info = {
+        "market_id": market.market_event.fixed_product_market_maker,
+        "question_id": market.question_event.question_id.hex(),
+        "creation_timestamp": market.market_creation_timestamp,
+        "condition_id": market.condition_id.hex(),
+        "initial_funds": float(initial_funds_usd),
+        "fee_perc": fee_perc,
+        "question": question,
+        "closing_time": closing_time.isoformat(),
+        "category": category,
+        "outcomes": outcomes,
+        "success": True
+    }
+    print(f"MARKET_CREATED: {market_info}")
 
 
 if __name__ == "__main__":
