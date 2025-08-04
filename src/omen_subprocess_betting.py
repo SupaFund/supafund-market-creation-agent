@@ -42,9 +42,9 @@ class OmenSubprocessBetting:
             if self.use_direct_python:
                 # Production environment: use direct Python with proper PYTHONPATH
                 cmd_args = [
-                    "python", "scripts/bet_omen.py",
+                    "python", "scripts/bet_omen.py", "buy",
                     "--market-id", market_id,
-                    "--amount", str(amount_usd),
+                    "--amount-usd", str(amount_usd),
                     "--outcome", outcome.lower(),
                     "--from-private-key", from_private_key
                 ]
@@ -54,9 +54,9 @@ class OmenSubprocessBetting:
             else:
                 # Development environment: use Poetry
                 cmd_args = [
-                    self.poetry_path, "run", "python", "scripts/bet_omen.py",
+                    self.poetry_path, "run", "python", "scripts/bet_omen.py", "buy",
                     "--market-id", market_id,
-                    "--amount", str(amount_usd),
+                    "--amount-usd", str(amount_usd),
                     "--outcome", outcome.lower(),
                     "--from-private-key", from_private_key
                 ]

@@ -97,9 +97,8 @@ class OmenSubprocessCreator:
                 env = None
                 logger.info(f"Using Poetry execution in development environment")
             
-            # Add optional arguments
-            if self.graph_api_key:
-                cmd_args.extend(["--graph-api-key", self.graph_api_key])
+            # Note: create_market_omen.py doesn't support --graph-api-key parameter
+            # The Graph API key is used internally by the tooling when needed
             
             logger.info(f"Creating market with question: {question}")
             logger.info(f"Closing time: {closing_time.isoformat()}")
