@@ -83,6 +83,7 @@ class OmenSubprocessCreator:
                     "--question", question,
                     "--closing-time", closing_time_formatted,
                     "--category", "supafund",
+                    "--initial-funds-usd", "0.01",
                     "--from-private-key", self.private_key
                 ]
                 env = os.environ.copy()
@@ -95,6 +96,7 @@ class OmenSubprocessCreator:
                     "--question", question,
                     "--closing-time", closing_time_formatted,
                     "--category", "supafund",
+                    "--initial-funds-usd", "0.01",
                     "--from-private-key", self.private_key
                 ]
                 env = None
