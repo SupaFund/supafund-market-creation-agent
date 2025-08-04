@@ -5,8 +5,8 @@ from datetime import datetime, timezone, timedelta
 import asyncio
 
 from .supabase_client import get_application_details, check_existing_market, create_market_record, get_market_by_application_id, update_market_record
-from .omen_creator import create_omen_market, parse_market_output
-from .omen_betting import place_bet
+from .omen_subprocess_creator import create_omen_market
+from .omen_subprocess_betting import place_bet
 from .vercel_logger import market_logger
 from .daily_scheduler import run_daily_resolution
 from .resolution_logger import resolution_logger
@@ -95,7 +95,7 @@ async def health_check():
         
         # Check if critical modules can be imported
         try:
-            from .blockchain.market_creator import create_omen_market
+            from .omen_subprocess_creator import create_omen_market
             health_status["blockchain_module"] = "available"
         except Exception as e:
             health_status["blockchain_module"] = f"error: {str(e)}"
@@ -185,28 +185,21 @@ async def handle_create_market(request: MarketCreationRequest):
     # 4. Parse market information and create database record
     logger.info(f"Parsing market creation output...")
     try:
-        # Generate the question that was used for market creation
-        project_name = application_details.get("project_name", "Unknown Project")
-        program_name = application_details.get("program_name", "Unknown Program")
-        application_id = application_details.get("application_id", "")
+        # Parse the JSON response from subprocess
+        market_result = json.loads(message)
+        market_info = market_result.get("market_info", {})
         
-        market_question = f'Will project "{project_name}" be approved for the "{program_name}" program? [Supafund App: {application_id}]'
+        # Extract question from the result
+        market_question = market_result.get("question", "")
         
-        market_info = parse_market_output(message)
-        
-        # Ensure we have the question in the parsed info
-        if not market_info.get("market_question"):
-            market_info["market_question"] = market_question
-            
         # Generate title from question if not present
-        if not market_info.get("market_title"):
-            market_info["market_title"] = market_question[:100] + "..." if len(market_question) > 100 else market_question
+        market_title = market_question[:100] + "..." if len(market_question) > 100 else market_question
         
         market_data = {
             "market_id": market_info.get("market_id", ""),
-            "market_title": market_info.get("market_title", ""),
+            "market_title": market_title,
             "market_url": market_info.get("market_url", ""),
-            "market_question": market_info.get("market_question", ""),
+            "market_question": market_question,
             "closing_time": market_info.get("closing_time"),
             "initial_funds_usd": market_info.get("initial_funds_usd", 0.01),
             "omen_creation_output": str(message) if hasattr(message, '__dict__') else message,

@@ -1,27 +1,35 @@
 version: 1.0
-runtime: python3
+source:
+  imageRepository:
+    imageIdentifier: '857736875791.dkr.ecr.us-west-2.amazonaws.com/supafund/market-creation-agent:latest'
+    imageConfiguration:
+      port: 8000
+  autoDeploymentsEnabled: false
 build:
   commands:
+    pre-build:
+      - echo "⚡ Starting build process..."
+      - echo "🔧 System preparation complete"
     build:
-      - echo "🔧 Installing system dependencies..."
-      - echo "📦 Installing Python dependencies..."
-      - pip install --no-cache-dir -r requirements.txt
-      - echo "✅ Dependencies installed successfully"
-  env:
-    - name: PYTHONPATH
-      value: "/app:/app/gnosis_predict_market_tool"
-    - name: PYTHONUNBUFFERED
-      value: "1"
-run:
-  runtime-version: 3.11
-  command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1
-  network:
-    port: 8000
-    env: PORT
-  env:
-    - name: PYTHONPATH
-      value: "/app:/app/gnosis_predict_market_tool"
-    - name: PYTHONUNBUFFERED
-      value: "1"
-    - name: WEB_CONCURRENCY
-      value: "1"
+      - echo "🐳 Using Docker image from ECR"
+      - echo "✅ Build completed successfully"
+instance:
+  cpu: 0.25 vcpu
+  memory: 0.5 GB
+network:
+  port: 8000
+  env: PORT
+env:
+  - name: PYTHONPATH
+    value: "/app:/app/gnosis_predict_market_tool"
+  - name: PYTHONUNBUFFERED
+    value: "1"
+  - name: WEB_CONCURRENCY
+    value: "1"
+healthCheck:
+  protocol: HTTP
+  path: /health
+  interval: 20
+  timeout: 5
+  healthyThreshold: 2
+  unhealthyThreshold: 5
