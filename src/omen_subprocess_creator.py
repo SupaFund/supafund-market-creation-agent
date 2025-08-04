@@ -72,13 +72,16 @@ class OmenSubprocessCreator:
             else:
                 closing_time = datetime.now(timezone.utc) + timedelta(days=30)
             
+            # Format closing time to match script expectations (remove microseconds and timezone)
+            closing_time_formatted = closing_time.strftime("%Y-%m-%dT%H:%M:%S")
+            
             # Choose execution method based on environment
             if self.use_direct_python:
                 # Production environment: use direct Python with proper PYTHONPATH
                 cmd_args = [
                     "python", "scripts/create_market_omen.py",
                     "--question", question,
-                    "--closing-time", closing_time.isoformat(),
+                    "--closing-time", closing_time_formatted,
                     "--category", "supafund",
                     "--from-private-key", self.private_key
                 ]
@@ -90,7 +93,7 @@ class OmenSubprocessCreator:
                 cmd_args = [
                     self.poetry_path, "run", "python", "scripts/create_market_omen.py",
                     "--question", question,
-                    "--closing-time", closing_time.isoformat(),
+                    "--closing-time", closing_time_formatted,
                     "--category", "supafund",
                     "--from-private-key", self.private_key
                 ]
@@ -101,7 +104,7 @@ class OmenSubprocessCreator:
             # The Graph API key is used internally by the tooling when needed
             
             logger.info(f"Creating market with question: {question}")
-            logger.info(f"Closing time: {closing_time.isoformat()}")
+            logger.info(f"Closing time: {closing_time_formatted}")
             
             # Execute the market creation command
             result = subprocess.run(
@@ -125,7 +128,7 @@ class OmenSubprocessCreator:
                     "success": True,
                     "market_info": market_info,
                     "question": question,
-                    "closing_time": closing_time.isoformat(),
+                    "closing_time": closing_time_formatted,
                     "raw_output": output
                 })
             else:
