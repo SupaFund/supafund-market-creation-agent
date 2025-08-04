@@ -46,7 +46,7 @@ class OmenSubprocessBetting:
                     "--market-id", market_id,
                     "--amount", str(amount_usd),
                     "--outcome", outcome.lower(),
-                    "--private-key", from_private_key
+                    "--from-private-key", from_private_key
                 ]
                 env = os.environ.copy()
                 env['PYTHONPATH'] = f"{self.omen_script_path}:{env.get('PYTHONPATH', '')}"
@@ -58,7 +58,7 @@ class OmenSubprocessBetting:
                     "--market-id", market_id,
                     "--amount", str(amount_usd),
                     "--outcome", outcome.lower(),
-                    "--private-key", from_private_key
+                    "--from-private-key", from_private_key
                 ]
                 env = None
                 logger.info(f"Using Poetry execution in development environment")

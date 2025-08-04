@@ -80,7 +80,7 @@ class OmenSubprocessCreator:
                     "--question", question,
                     "--closing-time", closing_time.isoformat(),
                     "--category", "supafund",
-                    "--private-key", self.private_key
+                    "--from-private-key", self.private_key
                 ]
                 env = os.environ.copy()
                 env['PYTHONPATH'] = f"{self.omen_script_path}:{env.get('PYTHONPATH', '')}"
@@ -92,7 +92,7 @@ class OmenSubprocessCreator:
                     "--question", question,
                     "--closing-time", closing_time.isoformat(),
                     "--category", "supafund",
-                    "--private-key", self.private_key
+                    "--from-private-key", self.private_key
                 ]
                 env = None
                 logger.info(f"Using Poetry execution in development environment")
