@@ -57,6 +57,7 @@ USER appuser
 ENV PYTHONPATH="/app:/app/gnosis_predict_market_tool"
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
+ENV USE_DIRECT_PYTHON=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

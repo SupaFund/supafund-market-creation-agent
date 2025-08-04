@@ -13,7 +13,7 @@ import time
 
 from .market_monitor import MarketMonitor
 from .resolution_researcher import GrokResolutionResearcher
-from .blockchain.resolution import submit_market_answer
+from .omen_subprocess_resolution import submit_market_answer_subprocess
 from .resolution_logger import resolution_logger
 from .supabase_client import get_supabase_client
 
@@ -471,8 +471,8 @@ class DailyResolutionScheduler:
             # Import config to get private key
             from .config import Config
             
-            # Use new blockchain resolution system
-            submission_result = submit_market_answer(
+            # Use subprocess-based resolution system
+            success, message = submit_market_answer_subprocess(
                 market_id=market_status.market_id,
                 outcome=resolution_result.outcome,
                 confidence=resolution_result.confidence,
@@ -481,6 +481,15 @@ class DailyResolutionScheduler:
                 bond_amount_xdai=0.01,  # Default bond amount
                 safe_address=None
             )
+            
+            # Create submission result object for compatibility
+            class SubmissionResult:
+                def __init__(self, success, message):
+                    self.success = success
+                    self.raw_output = message
+                    self.error_message = None if success else message
+            
+            submission_result = SubmissionResult(success, message)
             
             resolve_duration = time.time() - resolve_start_time
             success = submission_result.success

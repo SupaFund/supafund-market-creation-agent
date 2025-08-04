@@ -4,6 +4,7 @@ Omen betting using subprocess calls to gnosis_predict_market_tool
 import logging
 import subprocess
 import json
+import os
 from typing import Dict, Tuple
 from .config import Config
 
@@ -15,6 +16,9 @@ class OmenSubprocessBetting:
     def __init__(self):
         self.poetry_path = Config.POETRY_PATH
         self.omen_script_path = Config.OMEN_SCRIPT_PROJECT_PATH
+        
+        # Check if we're in a production environment (Docker)
+        self.use_direct_python = os.path.exists('/app/gnosis_predict_market_tool') or os.getenv('USE_DIRECT_PYTHON', 'false').lower() == 'true'
     
     def place_bet(self, market_id: str, amount_usd: float, outcome: str, 
                   from_private_key: str, safe_address: str = None, 
@@ -34,14 +38,30 @@ class OmenSubprocessBetting:
             Tuple of (success: bool, result: str)
         """
         try:
-            # Prepare command arguments
-            cmd_args = [
-                self.poetry_path, "run", "python", "scripts/bet_omen.py",
-                "--market-id", market_id,
-                "--amount", str(amount_usd),
-                "--outcome", outcome.lower(),
-                "--private-key", from_private_key
-            ]
+            # Choose execution method based on environment
+            if self.use_direct_python:
+                # Production environment: use direct Python with proper PYTHONPATH
+                cmd_args = [
+                    "python", "scripts/bet_omen.py",
+                    "--market-id", market_id,
+                    "--amount", str(amount_usd),
+                    "--outcome", outcome.lower(),
+                    "--private-key", from_private_key
+                ]
+                env = os.environ.copy()
+                env['PYTHONPATH'] = f"{self.omen_script_path}:{env.get('PYTHONPATH', '')}"
+                logger.info(f"Using direct Python execution in production environment")
+            else:
+                # Development environment: use Poetry
+                cmd_args = [
+                    self.poetry_path, "run", "python", "scripts/bet_omen.py",
+                    "--market-id", market_id,
+                    "--amount", str(amount_usd),
+                    "--outcome", outcome.lower(),
+                    "--private-key", from_private_key
+                ]
+                env = None
+                logger.info(f"Using Poetry execution in development environment")
             
             # Add optional arguments
             if safe_address:
@@ -58,7 +78,8 @@ class OmenSubprocessBetting:
                 cwd=self.omen_script_path,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes timeout
+                timeout=300,  # 5 minutes timeout
+                env=env
             )
             
             if result.returncode == 0:

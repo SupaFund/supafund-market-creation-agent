@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 import logging
 from datetime import datetime, timezone, timedelta
 import asyncio
+import json
 
 from .supabase_client import get_application_details, check_existing_market, create_market_record, get_market_by_application_id, update_market_record
 from .omen_subprocess_creator import create_omen_market
@@ -10,7 +11,11 @@ from .omen_subprocess_betting import place_bet
 from .vercel_logger import market_logger
 from .daily_scheduler import run_daily_resolution
 from .resolution_logger import resolution_logger
-from .blockchain.resolution import submit_market_answer, resolve_market_final, check_market_resolution_status
+from .omen_subprocess_resolution import (
+    submit_market_answer_subprocess, 
+    finalize_market_resolution_subprocess, 
+    check_market_resolution_status_subprocess
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -794,7 +799,7 @@ async def research_and_submit_market_answer(request: ResearchMarketRequest):
         # Step 6: Auto-submit answer to Reality.eth with default 0.01 xDai bond
         logger.info(f"🔗 Auto-submitting answer to Reality.eth: {blockchain_outcome}")
         
-        submission_result = submit_market_answer(
+        success, message = submit_market_answer_subprocess(
             market_id=request.market_id,
             outcome=blockchain_outcome,  # Use converted outcome
             confidence=research_result.confidence,
@@ -803,6 +808,15 @@ async def research_and_submit_market_answer(request: ResearchMarketRequest):
             bond_amount_xdai=0.01,  # Default bond amount as requested
             safe_address=None
         )
+        
+        # Create submission result object for compatibility
+        class SubmissionResult:
+            def __init__(self, success, message):
+                self.success = success
+                self.raw_output = message
+                self.error_message = None if success else message
+        
+        submission_result = SubmissionResult(success, message)
         
         # Step 6: Prepare comprehensive JSON response
         response_data = {
@@ -905,8 +919,8 @@ async def submit_market_answer_endpoint(request: SubmitAnswerRequest):
         logger.info(f"Received answer submission request for market {request.market_id}")
         logger.info(f"Outcome: {request.outcome}, Confidence: {request.confidence}")
         
-        # Submit the answer using the real blockchain resolution module
-        result = submit_market_answer(
+        # Submit the answer using subprocess calls
+        success, message = submit_market_answer_subprocess(
             market_id=request.market_id,
             outcome=request.outcome,
             confidence=request.confidence,
@@ -916,12 +930,21 @@ async def submit_market_answer_endpoint(request: SubmitAnswerRequest):
             safe_address=request.safe_address
         )
         
-        if not result.success:
-            logger.error(f"Failed to submit answer for market {request.market_id}: {result.error_message}")
+        if not success:
+            logger.error(f"Failed to submit answer for market {request.market_id}: {message}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to submit answer: {result.error_message}",
+                detail=f"Failed to submit answer: {message}",
             )
+        
+        # Parse the result message for transaction output
+        transaction_output = message
+        try:
+            import json
+            result_data = json.loads(message)
+            transaction_output = result_data.get("message", message)
+        except:
+            pass
         
         # Update database with answer submission info
         try:
@@ -941,7 +964,7 @@ async def submit_market_answer_endpoint(request: SubmitAnswerRequest):
                     "confidence": request.confidence,
                     "reasoning": request.reasoning,
                     "bond_amount_xdai": request.bond_amount_xdai,
-                    "transaction_output": result.raw_output
+                    "transaction_output": transaction_output
                 }
                 
                 current_metadata["answer_submission"] = answer_submission_info
@@ -971,7 +994,7 @@ async def submit_market_answer_endpoint(request: SubmitAnswerRequest):
             "outcome": request.outcome,
             "confidence": request.confidence,
             "bond_amount_xdai": request.bond_amount_xdai,
-            "transaction_output": result.raw_output,
+            "transaction_output": transaction_output,
         }
         
     except Exception as e:
@@ -992,19 +1015,28 @@ async def finalize_market_resolution_endpoint(request: FinalizeResolutionRequest
     try:
         logger.info(f"Received finalization request for market {request.market_id}")
         
-        # Finalize the market resolution using the real blockchain resolution module
-        result = resolve_market_final(
+        # Finalize the market resolution using subprocess calls
+        success, message = finalize_market_resolution_subprocess(
             market_id=request.market_id,
             from_private_key=request.from_private_key,
             safe_address=request.safe_address
         )
         
-        if not result.success:
-            logger.error(f"Failed to finalize resolution for market {request.market_id}: {result.error_message}")
+        if not success:
+            logger.error(f"Failed to finalize resolution for market {request.market_id}: {message}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to finalize resolution: {result.error_message}",
+                detail=f"Failed to finalize resolution: {message}",
             )
+        
+        # Parse the result message for transaction output
+        transaction_output = message
+        try:
+            import json
+            result_data = json.loads(message)
+            transaction_output = result_data.get("message", message)
+        except:
+            pass
         
         # Update database with finalization info
         try:
@@ -1020,7 +1052,7 @@ async def finalize_market_resolution_endpoint(request: FinalizeResolutionRequest
                 # Add finalization info to metadata
                 finalization_info = {
                     "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "transaction_output": result.raw_output
+                    "transaction_output": transaction_output
                 }
                 
                 current_metadata["finalization"] = finalization_info
@@ -1047,7 +1079,7 @@ async def finalize_market_resolution_endpoint(request: FinalizeResolutionRequest
             "status": "success",
             "message": "Market resolution finalized successfully",
             "market_id": request.market_id,
-            "transaction_output": result.raw_output,
+            "transaction_output": transaction_output,
         }
         
     except Exception as e:
@@ -1072,8 +1104,8 @@ async def get_market_resolution_status(market_id: str, from_private_key: str = N
         
         logger.info(f"Checking resolution status for market {market_id}")
         
-        # Check the market resolution status using the real blockchain resolution module
-        success, message, status_info = check_market_resolution_status(
+        # Check the market resolution status using subprocess calls
+        success, message, status_info = check_market_resolution_status_subprocess(
             market_id=market_id,
             from_private_key=from_private_key
         )

@@ -11,3 +11,8 @@ gnosis_predict_market_tool/.DS_Store
 src/.DS_Store
 .DS_Store
 .env
+ARCHITECTURE_FIX.md
+AWSCLIV2.pkg
+DOCKER_DEPLOYMENT_GUIDE.md
+install-deps-fast.sh
+QUICK_DEPLOY.md

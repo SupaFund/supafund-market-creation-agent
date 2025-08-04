@@ -19,6 +19,9 @@ class OmenSubprocessCreator:
         self.omen_script_path = Config.OMEN_SCRIPT_PROJECT_PATH
         self.private_key = Config.OMEN_PRIVATE_KEY
         self.graph_api_key = Config.GRAPH_API_KEY
+        
+        # Check if we're in a production environment (Docker)
+        self.use_direct_python = os.path.exists('/app/gnosis_predict_market_tool') or os.getenv('USE_DIRECT_PYTHON', 'false').lower() == 'true'
     
     def create_omen_market(self, application_details: dict) -> Tuple[bool, str]:
         """
@@ -69,14 +72,30 @@ class OmenSubprocessCreator:
             else:
                 closing_time = datetime.now(timezone.utc) + timedelta(days=30)
             
-            # Prepare command arguments
-            cmd_args = [
-                self.poetry_path, "run", "python", "scripts/create_market_omen.py",
-                "--question", question,
-                "--closing-time", closing_time.isoformat(),
-                "--category", "supafund",
-                "--private-key", self.private_key
-            ]
+            # Choose execution method based on environment
+            if self.use_direct_python:
+                # Production environment: use direct Python with proper PYTHONPATH
+                cmd_args = [
+                    "python", "scripts/create_market_omen.py",
+                    "--question", question,
+                    "--closing-time", closing_time.isoformat(),
+                    "--category", "supafund",
+                    "--private-key", self.private_key
+                ]
+                env = os.environ.copy()
+                env['PYTHONPATH'] = f"{self.omen_script_path}:{env.get('PYTHONPATH', '')}"
+                logger.info(f"Using direct Python execution in production environment")
+            else:
+                # Development environment: use Poetry
+                cmd_args = [
+                    self.poetry_path, "run", "python", "scripts/create_market_omen.py",
+                    "--question", question,
+                    "--closing-time", closing_time.isoformat(),
+                    "--category", "supafund",
+                    "--private-key", self.private_key
+                ]
+                env = None
+                logger.info(f"Using Poetry execution in development environment")
             
             # Add optional arguments
             if self.graph_api_key:
@@ -91,7 +110,8 @@ class OmenSubprocessCreator:
                 cwd=self.omen_script_path,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes timeout
+                timeout=300,  # 5 minutes timeout
+                env=env
             )
             
             if result.returncode == 0:
