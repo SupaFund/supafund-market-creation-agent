@@ -1,0 +1,31 @@
+# Railway Nixpacks configuration for Supafund Market Creation Agent
+
+[variables]
+PYTHON_VERSION = "3.11"
+PYTHONUNBUFFERED = "1"
+PYTHONPATH = "."
+
+[phases.setup]
+nixPkgs = ["python311", "python311Packages.pip", "poetry", "git"]
+nixLibs = ["zlib", "libffi", "openssl"]
+
+[phases.install]
+cmds = [
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  # Install gnosis_predict_market_tool dependencies with Poetry
+  "cd gnosis_predict_market_tool && poetry install --only=main --no-dev",
+  # Ensure proper permissions and paths
+  "cd ..",
+  "mkdir -p logs",
+  # Verify installation
+  "poetry --version",
+  "cd gnosis_predict_market_tool && poetry run python --version"
+]
+
+[start]
+cmd = "uvicorn src.main:app --host 0.0.0.0 --port $PORT --workers 1"

@@ -8,7 +8,7 @@ import json
 from .supabase_client import get_application_details, check_existing_market, create_market_record, get_market_by_application_id, update_market_record
 from .omen_subprocess_creator import create_omen_market
 from .omen_subprocess_betting import place_bet
-from .aws_logger import market_logger
+from .railway_logger import market_logger
 from .daily_scheduler import run_daily_resolution
 from .resolution_logger import resolution_logger
 from .omen_subprocess_resolution import (
@@ -76,7 +76,7 @@ async def read_root():
 @app.get("/health", tags=["Health Check"])
 async def health_check():
     """
-    Detailed health check endpoint for AWS App Runner.
+    Detailed health check endpoint for Railway deployment.
     """
     try:
         # Check basic functionality
@@ -85,25 +85,67 @@ async def health_check():
         # Basic system checks
         import sys
         import os
+        from .config import Config
+        
+        # Railway environment detection
+        railway_info = {
+            "is_railway": Config.IS_RAILWAY,
+            "environment": Config.RAILWAY_ENVIRONMENT,
+            "service_name": os.getenv("RAILWAY_SERVICE_NAME", "supafund-agent"),
+            "project_name": os.getenv("RAILWAY_PROJECT_NAME", "unknown"),
+            "deployment_id": os.getenv("RAILWAY_DEPLOYMENT_ID", "unknown"),
+            "host": Config.HOST,
+            "port": Config.PORT,
+            "static_url": os.getenv("RAILWAY_STATIC_URL", "not_set")
+        }
         
         health_status = {
             "status": "healthy",
             "timestamp": current_time,
             "service": "Supafund Market Creation Agent",
             "version": "1.0.0",
+            "platform": "railway",
             "python_version": sys.version.split()[0],
             "environment": {
                 "pythonpath_set": "PYTHONPATH" in os.environ,
                 "gnosis_tool_available": os.path.exists("gnosis_predict_market_tool"),
+                "is_local_dev": Config.IS_LOCAL,
+                "railway": railway_info
             }
         }
         
         # Check if critical modules can be imported
         try:
             from .omen_subprocess_creator import create_omen_market
-            health_status["blockchain_module"] = "available"
+            health_status["subprocess_creator"] = "available"
         except Exception as e:
-            health_status["blockchain_module"] = f"error: {str(e)}"
+            health_status["subprocess_creator"] = f"error: {str(e)}"
+            
+        # Check subprocess modules
+        try:
+            from .omen_subprocess_betting import place_bet
+            health_status["subprocess_betting"] = "available"
+        except Exception as e:
+            health_status["subprocess_betting"] = f"error: {str(e)}"
+            
+        # Check poetry availability (critical for Railway)
+        try:
+            import subprocess
+            result = subprocess.run([Config.POETRY_PATH, "--version"], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                health_status["poetry"] = f"available: {result.stdout.strip()}"
+            else:
+                health_status["poetry"] = f"error: {result.stderr.strip()}"
+        except Exception as e:
+            health_status["poetry"] = f"error: {str(e)}"
+            
+        # Log Railway startup info
+        market_logger.log_railway_startup(
+            str(Config.PORT), 
+            Config.HOST, 
+            os.getenv("RAILWAY_SERVICE_NAME", "supafund-agent")
+        )
             
         return health_status
         

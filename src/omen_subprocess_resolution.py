@@ -19,8 +19,16 @@ class OmenSubprocessResolution:
         self.omen_script_path = Config.OMEN_SCRIPT_PROJECT_PATH
         self.graph_api_key = Config.GRAPH_API_KEY
         
-        # Check if we're in a production environment (Docker)
-        self.use_direct_python = os.path.exists('/app/gnosis_predict_market_tool') or os.getenv('USE_DIRECT_PYTHON', 'false').lower() == 'true'
+        # Check if we're in a production environment (Railway or Docker)
+        # Railway detection: check for Railway environment variables
+        is_railway = Config.IS_RAILWAY
+        # Docker detection: check for /app path or explicit flag  
+        is_docker = os.path.exists('/app/gnosis_predict_market_tool')
+        # Explicit override
+        explicit_direct = os.getenv('USE_DIRECT_PYTHON', 'false').lower() == 'true'
+        
+        self.use_direct_python = is_railway or is_docker or explicit_direct
+        logger.info(f"Resolution Environment detection - Railway: {is_railway}, Docker: {is_docker}, Direct Python: {self.use_direct_python}")
     
     def submit_market_answer(self, market_id: str, outcome: str, confidence: float, 
                            reasoning: str, from_private_key: str, 

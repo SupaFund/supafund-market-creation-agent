@@ -1,0 +1,20 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "uvicorn src.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 3
+
+[env]
+# Railway automatically provides PORT environment variable
+# Environment identification for application
+RAILWAY_ENVIRONMENT = "production"
+PYTHONPATH = "."
+PYTHONUNBUFFERED = "1"
+
+# Poetry configuration for subprocess calls  
+POETRY_PATH = "poetry"
+OMEN_SCRIPT_PROJECT_PATH = "gnosis_predict_market_tool"

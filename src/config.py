@@ -42,6 +42,15 @@ class Config:
     GNOSIS_RPC_URL = os.getenv("GNOSIS_RPC_URL", "https://rpc.gnosischain.com")
     TRANSACTION_TIMEOUT = int(os.getenv("TRANSACTION_TIMEOUT", "300"))  # 5 minutes
     
+    # Railway deployment configuration
+    PORT = int(os.getenv("PORT", "8000"))  # Railway provides PORT dynamically
+    HOST = os.getenv("HOST", "0.0.0.0")  # Railway requires binding to 0.0.0.0
+    RAILWAY_ENVIRONMENT = os.getenv("RAILWAY_ENVIRONMENT", "unknown")  # Railway environment info
+    
+    # Environment detection
+    IS_RAILWAY = "RAILWAY_ENVIRONMENT" in os.environ or "RAILWAY_STATIC_URL" in os.environ
+    IS_LOCAL = not IS_RAILWAY
+    
     # Resolve OMEN_SCRIPT_PROJECT_PATH to an absolute path
     _omen_script_path_raw = os.getenv("OMEN_SCRIPT_PROJECT_PATH", ".")
     if os.path.isabs(_omen_script_path_raw):

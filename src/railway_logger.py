@@ -1,35 +1,35 @@
 """
-AWS App Runner compatible logging utility for tracking market operations.
-Replaces file-based logging with stdout/stderr and structured logging for AWS App Runner.
+Railway-compatible logging utility for tracking market operations.
+Uses stdout/stderr and structured logging optimized for Railway platform.
 """
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional, List
 
-class AwsAppRunnerLogger:
+class RailwayLogger:
     """
-    AWS App Runner compatible logger for market operations that uses stdout/stderr instead of files.
-    All logs are structured JSON for better observability in AWS App Runner.
+    Railway-compatible logger for market operations that uses stdout/stderr instead of files.
+    All logs are structured JSON for better observability in Railway logs.
     """
     
     def __init__(self):
-        # Setup structured logging for AWS App Runner
+        # Setup structured logging for Railway
         self.setup_loggers()
         # In-memory storage for recent logs (limited to prevent memory issues)
         self.recent_logs: List[Dict] = []
         self.max_logs = 1000  # Keep only last 1000 log entries
     
     def setup_loggers(self):
-        """Setup structured loggers for AWS App Runner environment."""
+        """Setup structured loggers for Railway environment."""
         
         # Market operations logger - outputs to stdout
-        self.market_logger = logging.getLogger('aws_app_runner_market_operations')
+        self.market_logger = logging.getLogger('railway_market_operations')
         self.market_logger.setLevel(logging.INFO)
         self.market_logger.handlers.clear()
         
-        # Console handler for stdout
+        # Console handler for stdout - Railway captures this automatically
         console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = logging.Formatter(
             '%(asctime)s - MARKET - %(levelname)s - %(message)s'
@@ -37,8 +37,8 @@ class AwsAppRunnerLogger:
         console_handler.setFormatter(console_formatter)
         self.market_logger.addHandler(console_handler)
         
-        # Error logger - outputs to stderr
-        self.error_logger = logging.getLogger('aws_app_runner_market_errors')
+        # Error logger - outputs to stderr - Railway captures this as error logs
+        self.error_logger = logging.getLogger('railway_market_errors')
         self.error_logger.setLevel(logging.ERROR)
         self.error_logger.handlers.clear()
         
@@ -56,13 +56,14 @@ class AwsAppRunnerLogger:
             self.recent_logs = self.recent_logs[-self.max_logs:]
     
     def _create_log_entry(self, operation: str, application_id: str, data: Dict = None) -> Dict:
-        """Create a structured log entry."""
+        """Create a structured log entry for Railway."""
         return {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "operation": operation,
             "application_id": application_id,
             "data": data or {},
-            "environment": "aws_app_runner"
+            "environment": "railway",
+            "platform": "railway_deployment"
         }
     
     def log_market_request(self, application_id: str, request_data: Dict):
@@ -70,7 +71,7 @@ class AwsAppRunnerLogger:
         log_entry = self._create_log_entry("market_request", application_id, request_data)
         self._add_to_memory(log_entry)
         
-        message = f"Market creation request for application {application_id}"
+        message = f"🚂 Railway - Market creation request for application {application_id}"
         self.market_logger.info(f"{message} | {json.dumps(log_entry)}")
     
     def log_duplicate_check(self, application_id: str, existing_market: Optional[Dict]):
@@ -82,7 +83,8 @@ class AwsAppRunnerLogger:
         log_entry = self._create_log_entry("duplicate_check", application_id, data)
         self._add_to_memory(log_entry) 
         
-        message = f"Duplicate check for application {application_id}: {'found' if existing_market else 'none'}"
+        status_emoji = "⚠️" if existing_market else "✅"
+        message = f"{status_emoji} Duplicate check for application {application_id}: {'found' if existing_market else 'none'}"
         self.market_logger.info(f"{message} | {json.dumps(log_entry)}")
     
     def log_market_creation_start(self, application_id: str, application_details: Dict):
@@ -90,7 +92,7 @@ class AwsAppRunnerLogger:
         log_entry = self._create_log_entry("creation_start", application_id, application_details)
         self._add_to_memory(log_entry)
         
-        message = f"Starting market creation for {application_details.get('project_name', 'unknown')}"
+        message = f"🏗️ Starting market creation for {application_details.get('project_name', 'unknown')}"
         self.market_logger.info(f"{message} | {json.dumps(log_entry)}")
     
     def log_market_creation_success(self, application_id: str, market_info: Dict, raw_output: str):
@@ -103,7 +105,7 @@ class AwsAppRunnerLogger:
         log_entry = self._create_log_entry("creation_success", application_id, data)
         self._add_to_memory(log_entry)
         
-        message = f"Market created successfully: {market_info.get('market_id', 'unknown')}"
+        message = f"🎉 Market created successfully: {market_info.get('market_id', 'unknown')}"
         self.market_logger.info(f"{message} | {json.dumps(log_entry)}")
     
     def log_market_creation_failure(self, application_id: str, error_message: str, application_details: Dict):
@@ -116,7 +118,7 @@ class AwsAppRunnerLogger:
         log_entry = self._create_log_entry("creation_failure", application_id, data)
         self._add_to_memory(log_entry)
         
-        message = f"Market creation failed for {application_id}: {error_message}"
+        message = f"❌ Market creation failed for {application_id}: {error_message}"
         self.error_logger.error(f"{message} | {json.dumps(log_entry)}")
     
     def log_database_operation(self, operation: str, application_id: str, success: bool, data: Dict):
@@ -129,7 +131,25 @@ class AwsAppRunnerLogger:
         log_entry = self._create_log_entry("database", application_id, log_data)
         self._add_to_memory(log_entry)
         
-        message = f"Database {operation} for {application_id}: {'success' if success else 'failed'}"
+        status_emoji = "✅" if success else "❌"
+        message = f"{status_emoji} Database {operation} for {application_id}: {'success' if success else 'failed'}"
+        logger = self.market_logger if success else self.error_logger
+        level = "info" if success else "error"
+        getattr(logger, level)(f"{message} | {json.dumps(log_entry)}")
+    
+    def log_subprocess_call(self, operation: str, command: str, application_id: str = None, success: bool = True, output: str = ""):
+        """Log subprocess operations (Railway-specific addition)."""
+        data = {
+            "command": command,
+            "success": success,
+            "output_length": len(output),
+            "railway_subprocess": True
+        }
+        log_entry = self._create_log_entry("subprocess", application_id or "system", data)
+        self._add_to_memory(log_entry)
+        
+        status_emoji = "🔧" if success else "⚠️"
+        message = f"{status_emoji} Railway subprocess {operation}: {command[:100]}{'...' if len(command) > 100 else ''}"
         logger = self.market_logger if success else self.error_logger
         level = "info" if success else "error"
         getattr(logger, level)(f"{message} | {json.dumps(log_entry)}")
@@ -139,12 +159,13 @@ class AwsAppRunnerLogger:
         data = {
             "error_type": error_type,
             "error_message": error_message,
+            "railway_error": True,
             **kwargs
         }
         log_entry = self._create_log_entry("error", application_id or "unknown", data)
         self._add_to_memory(log_entry)
         
-        message = f"Error ({error_type}): {error_message}"
+        message = f"🚨 Railway Error ({error_type}): {error_message}"
         self.error_logger.error(f"{message} | {json.dumps(log_entry)}")
     
     def get_market_logs(self, application_id: str) -> List[Dict]:
@@ -169,6 +190,20 @@ class AwsAppRunnerLogger:
             log for log in self.recent_logs
             if log.get("operation") == operation
         ]
+    
+    def log_railway_startup(self, port: str, host: str, service_name: str = "unknown"):
+        """Railway-specific startup logging."""
+        data = {
+            "port": port,
+            "host": host,
+            "service_name": service_name,
+            "railway_startup": True
+        }
+        log_entry = self._create_log_entry("railway_startup", "system", data)
+        self._add_to_memory(log_entry)
+        
+        message = f"🚂 Railway startup: {service_name} on {host}:{port}"
+        self.market_logger.info(f"{message} | {json.dumps(log_entry)}")
 
-# Create global logger instance for AWS App Runner
-market_logger = AwsAppRunnerLogger()
+# Create global logger instance for Railway
+market_logger = RailwayLogger()

@@ -1,4 +1,4 @@
-# 主应用核心依赖 - 精简版
+# Railway部署优化依赖 - 精简版本
 # FastAPI 服务依赖
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
