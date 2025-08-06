@@ -5,8 +5,6 @@ builder = "nixpacks"
 startCommand = "uvicorn src.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
-restartPolicyType = "on-failure"
-restartPolicyMaxRetries = 3
 
 [env]
 # Railway automatically provides PORT environment variable
