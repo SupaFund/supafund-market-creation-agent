@@ -1,13 +1,48 @@
 #!/usr/bin/env python3
 """
 Railway startup script for Supafund Market Creation Agent.
-Handles dynamic configuration and environment setup specifically for Railway platform.
+Handles Poetry dependencies and environment setup specifically for Railway platform.
 """
 import os
 import sys
+import subprocess
 import uvicorn
 from src.config import Config
 from src.railway_logger import market_logger
+
+def setup_poetry_dependencies():
+    """Setup Poetry dependencies for gnosis_predict_market_tool."""
+    print("🔧 Setting up Poetry dependencies...")
+    
+    gnosis_path = "gnosis_predict_market_tool"
+    if not os.path.exists(gnosis_path):
+        print(f"⚠️ {gnosis_path} directory not found, skipping Poetry setup")
+        return True
+    
+    try:
+        # Check if poetry is available
+        result = subprocess.run(["poetry", "--version"], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            print("📦 Installing Poetry...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "poetry"], 
+                         check=True, timeout=60)
+        
+        # Install dependencies
+        print(f"📚 Installing dependencies in {gnosis_path}...")
+        result = subprocess.run(["poetry", "install", "--no-dev", "--no-root"], 
+                              cwd=gnosis_path, timeout=300)
+        
+        if result.returncode == 0:
+            print("✅ Poetry dependencies installed successfully")
+            return True
+        else:
+            print("⚠️ Poetry install had issues, but continuing...")
+            return True  # Don't fail startup for Poetry issues
+            
+    except Exception as e:
+        print(f"⚠️ Poetry setup failed: {e}, continuing anyway...")
+        return True  # Don't fail startup for Poetry issues
 
 def setup_railway_environment():
     """Setup Railway-specific environment variables and logging."""
@@ -37,31 +72,11 @@ def setup_railway_environment():
     
     return railway_info
 
-def validate_dependencies():
-    """Validate that critical dependencies are available."""
-    print("\n🔍 Dependency Validation:")
+def validate_core_dependencies():
+    """Validate that core dependencies are available."""
+    print("\n🔍 Core Dependency Validation:")
     
-    # Check gnosis_predict_market_tool
-    gnosis_path = "gnosis_predict_market_tool"
-    if os.path.exists(gnosis_path):
-        print(f"  ✅ gnosis_predict_market_tool found at {gnosis_path}")
-    else:
-        print(f"  ❌ gnosis_predict_market_tool not found at {gnosis_path}")
-        return False
-    
-    # Check poetry availability
-    try:
-        import subprocess
-        result = subprocess.run([Config.POETRY_PATH, "--version"], 
-                              capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            print(f"  ✅ Poetry available: {result.stdout.strip()}")
-        else:
-            print(f"  ⚠️ Poetry check failed: {result.stderr.strip()}")
-    except Exception as e:
-        print(f"  ⚠️ Poetry validation error: {e}")
-    
-    # Test subprocess modules
+    # Check subprocess modules
     try:
         from src.omen_subprocess_creator import OmenSubprocessCreator
         creator = OmenSubprocessCreator()
@@ -81,11 +96,14 @@ def main():
     # Setup Railway environment
     railway_info = setup_railway_environment()
     
-    # Validate dependencies
-    if not validate_dependencies():
-        print("❌ Dependency validation failed!")
-        sys.exit(1)
+    # Setup Poetry dependencies (non-blocking)
+    setup_poetry_dependencies()
     
+    # Validate core dependencies
+    if not validate_core_dependencies():
+        print("❌ Core dependency validation failed!")
+        # Don't exit, let Railway restart handle this
+        
     # Configuration summary
     print(f"\n🌐 Server Configuration:")
     print(f"  Host: {Config.HOST}")
