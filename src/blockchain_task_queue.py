@@ -296,15 +296,24 @@ class BlockchainTaskQueue:
             success, result = create_omen_market(application_details)
             
             if success:
-                # Parse market output for database storage
-                from .omen_subprocess_creator import parse_market_output
-                market_info = parse_market_output(result)
-                
-                return {
-                    "success": True,
-                    "market_info": market_info,
-                    "raw_output": str(result)
-                }
+                # Parse the JSON result returned by create_omen_market
+                import json
+                try:
+                    result_data = json.loads(result)
+                    market_info = result_data.get("market_info", {})
+                    
+                    return {
+                        "success": True,
+                        "market_info": market_info,
+                        "raw_output": str(result)
+                    }
+                except json.JSONDecodeError:
+                    # Fallback if result is not JSON
+                    return {
+                        "success": True,
+                        "market_info": {"raw_output": str(result)},
+                        "raw_output": str(result)
+                    }
             else:
                 return {"success": False, "error": str(result)}
                 
