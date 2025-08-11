@@ -34,9 +34,10 @@ class OmenSubprocessCreator:
         # Explicit override flag
         explicit_direct = os.getenv('USE_DIRECT_PYTHON', 'false').lower() == 'true'
         
-        # Use direct Python only for genuine Docker or explicit override
-        # Railway always uses Poetry even if path is /app
-        self.use_direct_python = is_genuine_docker or explicit_direct
+        # Railway environment should use direct Python (Poetry not reliably available)
+        # Docker environment should use direct Python 
+        # Local development should use Poetry
+        self.use_direct_python = is_railway or railway_env or is_genuine_docker or explicit_direct
         
         logger.info(f"Environment detection - Railway: {is_railway}/{railway_env}, Docker: {is_genuine_docker}, Direct Python: {self.use_direct_python}")
         logger.info(f"Execution strategy: {'Direct Python' if self.use_direct_python else 'Poetry'} ({'Railway' if is_railway or railway_env else 'Docker' if is_genuine_docker else 'Local'} environment)")
@@ -95,7 +96,7 @@ class OmenSubprocessCreator:
             
             # Choose execution method based on environment
             if self.use_direct_python:
-                # Docker environment: use direct Python with proper PYTHONPATH
+                # Railway/Docker environment: use direct Python with proper PYTHONPATH
                 cmd_args = [
                     "python", "scripts/create_market_omen.py",
                     "--question", question,
@@ -106,9 +107,9 @@ class OmenSubprocessCreator:
                 ]
                 env = os.environ.copy()
                 env['PYTHONPATH'] = f"{self.omen_script_path}:{env.get('PYTHONPATH', '')}"
-                logger.info(f"Using direct Python execution in Docker environment")
+                logger.info(f"Using direct Python execution (Railway/Docker environment)")
             else:
-                # Development environment: use Poetry
+                # Local development environment: use Poetry
                 cmd_args = [
                     self.poetry_path, "run", "python", "scripts/create_market_omen.py",
                     "--question", question,
@@ -118,7 +119,7 @@ class OmenSubprocessCreator:
                     "--from-private-key", self.private_key
                 ]
                 env = None
-                logger.info(f"Using Poetry execution (Railway/Local environment)")
+                logger.info(f"Using Poetry execution (Local development environment)")
             
             # Note: create_market_omen.py doesn't support --graph-api-key parameter
             # The Graph API key is used internally by the tooling when needed
