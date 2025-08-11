@@ -16,6 +16,23 @@ from .omen_subprocess_resolution import (
     finalize_market_resolution_subprocess, 
     check_market_resolution_status_subprocess
 )
+from .async_blockchain_endpoints import (
+    handle_create_market_async,
+    handle_bet_async,
+    handle_submit_answer_async,
+    handle_finalize_resolution_async,
+    handle_research_and_submit_async,
+    get_task_status,
+    get_recent_tasks,
+    AsyncTaskResponse,
+    TaskStatusResponse,
+    MarketCreationAsyncRequest,
+    BetAsyncRequest,
+    SubmitAnswerAsyncRequest,
+    FinalizeResolutionAsyncRequest,
+    ResearchAndSubmitAsyncRequest
+)
+from .blockchain_task_queue import blockchain_task_queue
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1173,4 +1190,170 @@ async def get_market_resolution_status(market_id: str, from_private_key: str = N
             status_code=500,
             detail=f"Error checking resolution status: {str(e)}",
         )
+
+
+# === ASYNC BLOCKCHAIN ENDPOINTS ===
+# These endpoints return immediately with task IDs to prevent frontend blocking
+
+@app.post("/async/create-market", tags=["Async Blockchain Operations"], response_model=AsyncTaskResponse)
+async def create_market_async(request: MarketCreationAsyncRequest):
+    """
+    🚀 ASYNC: Create a prediction market without blocking.
+    Returns immediately with a task ID for status tracking.
+    
+    **New Async Flow:**
+    1. Submit request → Get task_id immediately  
+    2. Check `/task-status/{task_id}` for progress
+    3. Market creation happens in background (2-5 minutes)
+    """
+    return await handle_create_market_async(request)
+
+@app.post("/async/bet", tags=["Async Blockchain Operations"], response_model=AsyncTaskResponse)
+async def place_bet_async(request: BetAsyncRequest):
+    """
+    🚀 ASYNC: Place a bet without blocking.
+    Returns immediately with a task ID for status tracking.
+    
+    **New Async Flow:**
+    1. Submit request → Get task_id immediately
+    2. Check `/task-status/{task_id}` for progress  
+    3. Bet placement happens in background (1-3 minutes)
+    """
+    return await handle_bet_async(request)
+
+@app.post("/async/submit-answer", tags=["Async Blockchain Operations"], response_model=AsyncTaskResponse)
+async def submit_answer_async(request: SubmitAnswerAsyncRequest):
+    """
+    🚀 ASYNC: Submit market answer without blocking.
+    Returns immediately with a task ID for status tracking.
+    
+    **New Async Flow:**
+    1. Submit request → Get task_id immediately
+    2. Check `/task-status/{task_id}` for progress
+    3. Answer submission happens in background (1-2 minutes)
+    """
+    return await handle_submit_answer_async(request)
+
+@app.post("/async/finalize-resolution", tags=["Async Blockchain Operations"], response_model=AsyncTaskResponse)
+async def finalize_resolution_async(request: FinalizeResolutionAsyncRequest):
+    """
+    🚀 ASYNC: Finalize market resolution without blocking.
+    Returns immediately with a task ID for status tracking.
+    
+    **New Async Flow:**
+    1. Submit request → Get task_id immediately
+    2. Check `/task-status/{task_id}` for progress
+    3. Resolution finalization happens in background (1-2 minutes)
+    """
+    return await handle_finalize_resolution_async(request)
+
+@app.post("/async/research-and-submit", tags=["Async Blockchain Operations"], response_model=AsyncTaskResponse)
+async def research_and_submit_async(request: ResearchAndSubmitAsyncRequest):
+    """
+    🚀 ASYNC: Research market outcome and submit answer without blocking.
+    Returns immediately with a task ID for status tracking.
+    
+    **New Async Flow:**
+    1. Submit request → Get task_id immediately
+    2. Check `/task-status/{task_id}` for progress
+    3. Research + submission happens in background (3-5 minutes)
+    """
+    return await handle_research_and_submit_async(request)
+
+# === TASK STATUS AND MONITORING ENDPOINTS ===
+
+@app.get("/task-status/{task_id}", tags=["Task Management"], response_model=TaskStatusResponse)
+async def get_blockchain_task_status(task_id: str):
+    """
+    📊 Get the current status of a blockchain task.
+    
+    **Task Statuses:**
+    - `pending`: Task queued, waiting to start
+    - `processing`: Task currently executing  
+    - `completed`: Task finished successfully
+    - `failed`: Task failed permanently after retries
+    - `retrying`: Task failed, will retry automatically
+    - `cancelled`: Task was cancelled
+    
+    **Usage:**
+    After submitting any async blockchain operation, use this endpoint
+    to monitor progress and get results when completed.
+    """
+    return await get_task_status(task_id)
+
+@app.get("/tasks/recent", tags=["Task Management"])
+async def get_recent_blockchain_tasks(
+    hours: int = 24, 
+    status: str = None
+):
+    """
+    📋 Get recent blockchain tasks with optional status filter.
+    
+    **Parameters:**
+    - `hours`: How many hours back to look (default: 24)
+    - `status`: Filter by status (pending, processing, completed, failed, retrying)
+    
+    **Usage:**
+    Monitor all blockchain operations and their statuses.
+    Useful for debugging and operational monitoring.
+    """
+    return await get_recent_tasks(hours, status)
+
+@app.get("/tasks/queue-status", tags=["Task Management"])
+async def get_queue_status():
+    """
+    🔄 Get current blockchain task queue status and metrics.
+    
+    **Returns:**
+    - Queue size and processing statistics  
+    - Worker status and concurrent task limits
+    - Recent task completion rates
+    """
+    try:
+        from .blockchain_task_queue import TaskStatus
+        
+        # Get task statistics
+        pending_tasks = await blockchain_task_queue.get_tasks_by_status(TaskStatus.PENDING)
+        processing_tasks = await blockchain_task_queue.get_tasks_by_status(TaskStatus.PROCESSING)
+        recent_completed = await blockchain_task_queue.get_tasks_by_status(TaskStatus.COMPLETED)
+        recent_failed = await blockchain_task_queue.get_tasks_by_status(TaskStatus.FAILED)
+        
+        # Filter recent tasks (last 6 hours)
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+        recent_completed = [t for t in recent_completed if t.updated_at > recent_cutoff]
+        recent_failed = [t for t in recent_failed if t.updated_at > recent_cutoff]
+        
+        return {
+            "status": "healthy",
+            "queue_metrics": {
+                "pending_tasks": len(pending_tasks),
+                "processing_tasks": len(processing_tasks),
+                "max_concurrent_tasks": blockchain_task_queue.max_concurrent_tasks,
+                "workers_started": blockchain_task_queue.workers_started
+            },
+            "recent_performance": {
+                "completed_last_6h": len(recent_completed),
+                "failed_last_6h": len(recent_failed),
+                "success_rate": round(
+                    len(recent_completed) / max(1, len(recent_completed) + len(recent_failed)) * 100, 
+                    2
+                ) if recent_completed or recent_failed else 100
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting queue status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting queue status: {str(e)}"
+        )
+
+# Startup event to initialize the blockchain task queue
+@app.on_event("startup")
+async def startup_event():
+    """Initialize blockchain task queue workers on application startup"""
+    logger.info("🚀 Starting blockchain task queue workers...")
+    await blockchain_task_queue.start_workers()
+    logger.info("✅ Blockchain task queue initialized")
 
