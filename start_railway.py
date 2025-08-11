@@ -10,39 +10,86 @@ import uvicorn
 from src.config import Config
 from src.railway_logger import market_logger
 
-def setup_poetry_dependencies():
-    """Setup Poetry dependencies for gnosis_predict_market_tool."""
-    print("🔧 Setting up Poetry dependencies...")
+def setup_blockchain_dependencies():
+    """Setup blockchain tool dependencies for Railway direct Python execution."""
+    print("🔧 Setting up blockchain tool dependencies...")
     
-    gnosis_path = "gnosis_predict_market_tool"
-    if not os.path.exists(gnosis_path):
-        print(f"⚠️ {gnosis_path} directory not found, skipping Poetry setup")
-        return True
+    # Since Railway uses direct Python execution, we ensure critical dependencies
+    # are available in the main Python environment
     
     try:
-        # Check if poetry is available
-        result = subprocess.run(["poetry", "--version"], 
-                              capture_output=True, text=True, timeout=10)
-        if result.returncode != 0:
-            print("📦 Installing Poetry...")
-            subprocess.run([sys.executable, "-m", "pip", "install", "poetry"], 
-                         check=True, timeout=60)
+        # Test critical imports that create_market_omen.py needs
+        import typer
+        print("✅ typer available")
         
-        # Install dependencies
-        print(f"📚 Installing dependencies in {gnosis_path}...")
-        result = subprocess.run(["poetry", "install", "--no-dev", "--no-root"], 
-                              cwd=gnosis_path, timeout=300)
+        import web3
+        print("✅ web3 available") 
         
-        if result.returncode == 0:
-            print("✅ Poetry dependencies installed successfully")
-            return True
-        else:
-            print("⚠️ Poetry install had issues, but continuing...")
-            return True  # Don't fail startup for Poetry issues
+        import eth_account
+        print("✅ eth_account available")
+        
+        import numpy
+        print("✅ numpy available")
+        
+        # Google Cloud dependencies
+        from google.cloud import functions_v1
+        print("✅ google-cloud-functions available")
+        
+        from google.cloud import secretmanager
+        print("✅ google-cloud-secret-manager available")
+        
+        print("✅ All critical blockchain dependencies available")
+        return True
+        
+    except ImportError as e:
+        print(f"⚠️ Missing dependency: {e}")
+        print("📦 Installing missing dependencies...")
+        
+        # Install missing dependencies
+        missing_packages = []
+        
+        try:
+            import typer
+        except ImportError:
+            missing_packages.append("typer>=0.9.0")
             
+        try:
+            import web3
+        except ImportError:
+            missing_packages.append("web3>=6.15.1")
+            
+        try:
+            import eth_account
+        except ImportError:
+            missing_packages.append("eth-account>=0.8.0")
+            
+        try:
+            import numpy
+        except ImportError:
+            missing_packages.append("numpy>=1.26.4")
+            
+        try:
+            from google.cloud import functions_v1
+        except ImportError:
+            missing_packages.append("google-cloud-functions>=1.16.0")
+            
+        try:
+            from google.cloud import secretmanager
+        except ImportError:
+            missing_packages.append("google-cloud-secret-manager>=2.18.2")
+        
+        if missing_packages:
+            print(f"📦 Installing: {', '.join(missing_packages)}")
+            subprocess.run([
+                sys.executable, "-m", "pip", "install"
+            ] + missing_packages, check=True, timeout=180)
+            print("✅ Missing dependencies installed")
+        
+        return True
+        
     except Exception as e:
-        print(f"⚠️ Poetry setup failed: {e}, continuing anyway...")
-        return True  # Don't fail startup for Poetry issues
+        print(f"⚠️ Dependency setup failed: {e}, continuing anyway...")
+        return True  # Don't fail startup for dependency issues
 
 def setup_railway_environment():
     """Setup Railway-specific environment variables and logging."""
@@ -96,8 +143,8 @@ def main():
     # Setup Railway environment
     railway_info = setup_railway_environment()
     
-    # Setup Poetry dependencies (non-blocking)
-    setup_poetry_dependencies()
+    # Setup blockchain dependencies for direct Python execution (non-blocking)
+    setup_blockchain_dependencies()
     
     # Validate core dependencies
     if not validate_core_dependencies():
